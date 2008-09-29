@@ -1,0 +1,17 @@
+/mtracker additem <item_link> 
+	this will allow you to add items to track that are not already being tracked
+
+/mtracker item <item_link> 
+	this will print to the default chat window a breakdown of the items that are held on your other toons
+
+/mtracker resetdata 
+	this will erase all of the materials that have been recorded. You should be careful with this one
+
+/mtracker tooltips 
+	enable/disable tooltip display. Enabled by default. Can be turned off if this addon is used as a library
+
+/mtracker debug 
+	will toggle debug on/off 
+
+/mtracker debugLevel <level number> 
+	this will set the level of detail for the debug entries.  currently 1=INFO, 2=TRACE

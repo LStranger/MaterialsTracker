@@ -1,0 +1,52 @@
+v20100.01
+* interface number update
+* upgraded ace2 libraries
+
+**********************************************************************
+v20003.02
+* removed localization file.  This mod does not need to be localized, it gathers all its data from in-game, which each client will return localized already.
+* removed the annoying message wdisplayed when scanning the mailbox.
+
+**********************************************************************
+v20003.01
+* interface number update
+* upgraded ace2 libraries
+
+v20000.04
+* fixed issues with tooltips
+* upgraded ace2 libraries
+
+20000.03
+* updated for Before the Storm
+* Ace2 implemented. This means you will lose your previously stored information.
+
+11200.09
+* Finally found the issue with the hard locks while scanning mail.  I had to wait for patch day to troubleshoot it since it only occurs after a patch is installed.  As a result, mail will only be scanned once per minute.  This means if you open ur mailbox more than once in a minute, it will only be scanned the first time, you will need to wait a minute before MT will scan it again.  (It does not mean that MT is constantly trying to scan ur mailbox.  You still need to trigger that by opening the mailbox)
+
+11200.08 
+* Just an updated toc and version for patch 1.12
+
+11100.08
+* Profession tracking is now implemented.  So the tooltip will now display which profession the material is used in.
+
+11100.07
+* Added new slash command 'additem'.  Read the notes above on how it is used.
+* some code refactoring.
+* started to add some code to track which profession the material is used in.  This is not yet complete.
+
+11100.06
+* added code locking to prevent dealing with multiple mailbox update events. this was causing some wow client freeze ups 
+
+11100.05
+* Fixed table is nil error
+
+11000.04
+* Added a new slash command 'item'.  See description for usage.
+* Updated .toc interface version for patch 1.11
+
+11000.03
+* Fixed issue in scanning of mail stored in the mailbox
+
+11000.02
+* Added Mailbox counts.
+

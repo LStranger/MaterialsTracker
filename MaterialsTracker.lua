@@ -1,8 +1,9 @@
-MATERIALSTRACKER_VERSION = "20100.01";
+MATERIALSTRACKER_VERSION = "30000.01";
 MATERIALSTRACKER_DB_VERSION = 20001;
 
 --runtime variables
 local MTracker_BankIsOpen = false;
+local MTracker_GuildBankIsOpen = false;
 local MTracker_MailboxIsOpen = false;
 local MTracker_MailUpdatesInProgress = false;
 local MTracker_CurrentPlayer = {};
@@ -128,12 +129,13 @@ end
 function MTracker:RegisterOurEvents()
 	self:RegisterEvent("BAG_UPDATE", "UpdateNumberInBag");
 	self:RegisterEvent("TRADE_SKILL_SHOW", "UpdateTradeSkillsSavedMaterials");
-	self:RegisterEvent("CRAFT_SHOW", "UpdateCraftingSavedMaterials");
 	self:RegisterEvent("BANKFRAME_OPENED", "BankIsOpened");
 	self:RegisterEvent("BANKFRAME_CLOSED", "BankIsClosed");
 	self:RegisterEvent("MAIL_SHOW", "MailboxIsOpened");
 	self:RegisterEvent("MAIL_CLOSED", "MailboxIsClosed");
 	self:RegisterEvent("MAIL_INBOX_UPDATE", "MailInboxUpdate");
+--	self:RegisterEvent("GUILDBANKFRAME_OPENED", "GuildBankIsOpened");
+--	self:RegisterEvent("GUILDBANKFRAME_CLOSED", "GuildBankIsClosed");
 end
 
 function MTracker:BankIsOpened()
@@ -156,15 +158,12 @@ function MTracker:MailInboxUpdate()
 	end
 end
 
---called when the craft frame is shown
-function MTracker:UpdateCraftingSavedMaterials()
-	self:LevelDebug(mt_TRACE, "MTracker:UpdateCraftingSavedMaterials enter");
-
-	local tradeSkill = GetCraftSkillLine(1);
-	--TODO: create table in localization file and check that tradeSkill is in there.
-	if (tradeSkill) then
-		self:UpdateEnchantingSavedMaterials(tradeSkill);
-	end
+function MTracker:GuildBankIsOpened()
+	MTracker_GuildBankIsOpen = true;
+	self:UpdateNumberInGuildBank();
+end
+function MTracker:GuildBankIsClosed()
+	MTracker_GuildBankIsOpen = false;
 end
 
 function MTracker:UpdateTradeSkillsSavedMaterials()
@@ -198,17 +197,18 @@ function MTracker:UpdateNumberInMailbox()
 				
 		local nbr = GetInboxNumItems();
 		for mailItem=1, nbr, 1 do
-			local name, itemTexture, count, quality, canUse = GetInboxItem(mailItem);
-			self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox itemName is "..isNullOrValue(name));
+			for attachment=1, ATTACHMENTS_MAX_RECEIVE, 1 do
+				local name, itemTexture, count, quality, canUse = GetInboxItem(mailItem, attachment);
+				self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox itemName is "..isNullOrValue(name));
 
-			local code = self:getCodeFromName(name);
-			if (code and self.db.account.materials[code].tracked) then
-				self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox code is "..isNullOrValue(code));
-				self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail = 
-					(count + self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail);
+				local code = self:getCodeFromName(name);
+				if (code and self.db.account.materials[code].tracked) then
+					self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox code is "..isNullOrValue(code));
+					self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail = 
+						(count + self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail);
+				end
 			end
 		end
-
 		--unlock it when we are done.
 		MTracker_MailUpdatesInProgress=false;
 	end
@@ -290,6 +290,39 @@ function MTracker:UpdateNumberInBank()
 	end
 end
 
+function MTracker:UpdateNumberInGuildBank()
+	self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInGuildBank enter");
+	local playerName = MTracker_CurrentPlayer[1];
+	local realmName = MTracker_CurrentPlayer[2];
+	local guildName, guildRankName, guildRankIndex = GetGuildInfo("player");
+
+	if MTracker_GuildBankIsOpen then
+		local tab = GetCurrentGuildBankTab();
+		for i=1, MAX_GUILDBANK_SLOTS_PER_TAB do
+
+		end
+	end
+--		-- Update the tab items		
+--		local button, index, column;
+--		local texture, count, locked;
+--		for i=1, MAX_GUILDBANK_SLOTS_PER_TAB do
+--			index = mod(i, NUM_SLOTS_PER_GUILDBANK_GROUP);
+--			if ( index == 0 ) then
+--				index = NUM_SLOTS_PER_GUILDBANK_GROUP;
+--			end
+--			column = ceil((i-0.5)/NUM_SLOTS_PER_GUILDBANK_GROUP);
+--			button = getglobal("GuildBankColumn"..column.."Button"..index);
+--			button:SetID(i);
+--			texture, count, locked = GetGuildBankItemInfo(tab, i);
+--			SetItemButtonTexture(button, texture);
+--			SetItemButtonCount(button, count);
+--			SetItemButtonDesaturated(button, locked, 0.5, 0.5, 0.5);
+--			button.count = count;
+--			button.locked = locked;
+--		end
+
+end
+
 function MTracker:ResetBagCount() 
 	self:LevelDebug(mt_TRACE, "MTracker:ResetBagCount enter");
 	local playerName = MTracker_CurrentPlayer[1];
@@ -343,36 +376,6 @@ function MTracker:getCodeFromName(name)
 	return nil;
 end
 
-function MTracker:UpdateEnchantingSavedMaterials(craftName)
-	self:LevelDebug(mt_TRACE, "MTracker:UpdateEnchantingSavedMaterials enter");
-	local playerName = MTracker_CurrentPlayer[1];
-	local realmName = MTracker_CurrentPlayer[2];
-	
-	for i=1, GetNumCrafts(), 1 do
-		local name, craftSubSpellName, craftType, numAvailable, isExpanded = GetCraftInfo(i);
-		self:LevelDebug(mt_TRACE, "name is "..isNullOrValue(name));
-
-		if (craftType ~="header") then
-			for j=1, GetCraftNumReagents(i), 1 do
-				local reagentName, reagentTexture, reagentCount, playerReagentCount = GetCraftReagentInfo(i, j);
-				self:LevelDebug(mt_TRACE, "  reagentName is "..isNullOrValue(reagentName));
-				local reagentlink = GetCraftReagentItemLink(i,j);
-				local code = self:CodeFromLink(reagentlink);
-
-				if (code) then
-					self.db.account.materials[code].Texture = reagentTexture;
-					self.db.account.materials[code].Link = reagentlink;
-					self.db.account.materials[code].Name = reagentName;
-					self.db.account.materials[code].tracked = true;
-					self:AddProfessionNameToMaterial(code, craftName);
-				end
-			end
-		end
-	end
-	self:LevelDebug(mt_TRACE, "finished saving "..craftName.." materials");
---	self.db.account.config.DBVersion = MATERIALSTRACKER_DB_VERSION;
-end
-
 function MTracker:AddProfessionNameToMaterial(itemCode, professionName) 
 	self:LevelDebug(mt_TRACE, "MTracker:AddProfessionNameToMaterial enter");
 	self:LevelDebug(mt_TRACE, "adding "..isNullOrValue(professionName).." to "..isNullOrValue(itemCode));
@@ -415,9 +418,7 @@ end
 function MTracker:ItemBeingTracked(code) 
 	return self.db.account.materials[code].tracked;
 end
---function MTracker:getItemName(code) 
---	return self.db.account.materials[code].Name;
---end
+
 function MTracker:getUsedIn(code) 
 	return self.db.account.materials[code].UsedIn;
 end

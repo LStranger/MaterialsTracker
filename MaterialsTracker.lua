@@ -201,11 +201,13 @@ function MTracker:UpdateNumberInMailbox()
 				local name, itemTexture, count, quality, canUse = GetInboxItem(mailItem, attachment);
 				self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox itemName is "..isNullOrValue(name));
 
-				local code = self:getCodeFromName(name);
-				if (code and self.db.account.materials[code].tracked) then
-					self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox code is "..isNullOrValue(code));
-					self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail = 
-						(count + self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail);
+				if (name~= nil) then
+					local code = self:getCodeFromName(name);
+					if (code and self.db.account.materials[code].tracked) then
+						self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox code is "..isNullOrValue(code));
+						self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail = 
+							(count + self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail);
+					end
 				end
 			end
 		end
@@ -638,15 +640,26 @@ end
 
 --copied from EnhTooltip, thanks guys
 --Given an item link, splits it into it's component parts as follows:
---itemID, randomProperty, enchantment, uniqueID, itemName, gemSlot1, gemSlot2, gemSlot3, gemSlotBonus = breakLink(link);
---Note that the return order is not the same as the order of the items in the link
---(ie: randomProp and enchant are reversed from their link order)
 function MTracker:breakLink(link)
 	if (type(link) ~= 'string') then return end;
-	local itemID, enchant, gemSlot1, gemSlot2, gemSlot3, gemSocketBonus, randomProp, uniqID, name = link:match("|Hitem:(%p?%d+):(%p?%d+):(%p?%d+):(%p?%d+):(%p?%d+):(%p?%d+):(%p?%d+):(%p?%d+)|h%[(.-)%]|h");
-	return tonumber(itemID) or 0, tonumber(randomProp) or 0, tonumber(enchant) or 0, tonumber(uniqID) or 0, tostring(name), tonumber(gemSlot1) or 0, tonumber(gemSlot2) or 0, tonumber(gemSlot3) or 0, tonumber(gemSocketBonus) or 0;
+	local lType, itemID, enchant, gemSlot1, gemSlot2, gemSlot3, gemBonus, randomProp, uniqID, lichKing = MTracker:breakHyperlink("Hitem:", 6, strsplit("|", link))
+	if (lType ~= "item") then return end
+	name = link:match("|h%[(.-)%]|h")
+	return tonumber(itemID) or 0, tonumber(randomProp) or 0, tonumber(enchant) or 0, tonumber(uniqID) or 0, tostring(name), tonumber(gemSlot1) or 0, tonumber(gemSlot2) or 0, tonumber(gemSlot3) or 0, tonumber(gemBonus) or 0, randomFactor, tonumber(lichKing) or 0
 end
 
+-- Given a Blizzard item link, breaks it into it's itemID, randomProperty, enchantProperty, uniqueness, name and the four gemSlots.
+--This is a copy of the Auctioneer Adv version of breakitemlink, does the job very well compared to my code
+function MTracker:breakHyperlink(match, matchlen, ...)
+	local v
+	local n = select("#", ...)
+	for i = 2, n do
+		v = select(i, ...)
+		if (v:sub(1,matchlen) == match) then
+			return strsplit(":", v:sub(2))
+		end
+	end
+end
 
 function isNullOrValue(value)
 	if (value) then 

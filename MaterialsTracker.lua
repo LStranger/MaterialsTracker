@@ -23,11 +23,20 @@ MTracker:RegisterDefaults("account", {
 	['*'] = {
 		tracked=false,
 		ByPlayer = {
-			['*'] = {
-				['*'] = {
+			['*'] = {	--realm
+				['*'] = {	--playername
 					NbInMail=0,
 					NbInBank=0,
 					NbInBag=0,
+				},
+			},
+		},
+		ByGuild = {
+			['*'] = {	--realm
+				['*'] = {	--guild
+					['*'] = {	--tabname
+						NbInGBank=0,
+					}
 				},
 			},
 		},
@@ -134,8 +143,9 @@ function MTracker:RegisterOurEvents()
 	self:RegisterEvent("MAIL_SHOW", "MailboxIsOpened");
 	self:RegisterEvent("MAIL_CLOSED", "MailboxIsClosed");
 	self:RegisterEvent("MAIL_INBOX_UPDATE", "MailInboxUpdate");
---	self:RegisterEvent("GUILDBANKFRAME_OPENED", "GuildBankIsOpened");
---	self:RegisterEvent("GUILDBANKFRAME_CLOSED", "GuildBankIsClosed");
+	self:RegisterEvent("GUILDBANKFRAME_OPENED", "GuildBankIsOpened");
+	self:RegisterEvent("GUILDBANKFRAME_CLOSED", "GuildBankIsClosed");
+	self:RegisterEvent("GUILDBANKBAGSLOTS_CHANGED", "UpdateNumberInGuildBank");
 end
 
 function MTracker:BankIsOpened()
@@ -160,7 +170,7 @@ end
 
 function MTracker:GuildBankIsOpened()
 	MTracker_GuildBankIsOpen = true;
-	self:UpdateNumberInGuildBank();
+--	self:UpdateNumberInGuildBank();
 end
 function MTracker:GuildBankIsClosed()
 	MTracker_GuildBankIsOpen = false;
@@ -292,37 +302,45 @@ function MTracker:UpdateNumberInBank()
 	end
 end
 
+--	["ByGuild"] = {
+--		["realm"] = {
+--			["guild"] = {
+--				["tab1"] = {
+--					["NbInGBank"] = 9,
+--				}
+--				["tab2"] = {
+--					["NbInGBank"] = 9,
+--				}
+--			},
+--		},
+--	},
+
 function MTracker:UpdateNumberInGuildBank()
 	self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInGuildBank enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
-	local guildName, guildRankName, guildRankIndex = GetGuildInfo("player");
+	local guildName = GetGuildInfo("player");
 
-	if MTracker_GuildBankIsOpen then
-		local tab = GetCurrentGuildBankTab();
-		for i=1, MAX_GUILDBANK_SLOTS_PER_TAB do
-
+	if (guildName~=nil) then
+		if (MTracker_GuildBankIsOpen and GuildBankFrame.mode == "bank") then
+			local tab = GetCurrentGuildBankTab();
+			local name, icon, isViewable, canDeposit, numWithdrawals, remainingWithdrawals = GetGuildBankTabInfo(tab);
+			self:ResetGBankCount(realmName, guildName,tab);
+			for i=1, MAX_GUILDBANK_SLOTS_PER_TAB do				--currently 98
+				index = mod(i, NUM_SLOTS_PER_GUILDBANK_GROUP);		--currently 14
+				if ( index == 0 ) then
+					index = NUM_SLOTS_PER_GUILDBANK_GROUP;
+				end
+				local texture, itemCount, locked = GetGuildBankItemInfo(tab, i);
+				local itemLink = GetGuildBankItemLink(tab, i);
+				local code, itemName = self:GetNACFromLink(itemLink);
+				if (code and self.db.account.materials[code].tracked) then
+					self.db.account.materials[code].ByGuild[realmName][guildName][tab].NbInGBank = 
+						(itemCount + self.db.account.materials[code].ByGuild[realmName][guildName][tab].NbInGBank);
+				end
+			end
 		end
 	end
---		-- Update the tab items		
---		local button, index, column;
---		local texture, count, locked;
---		for i=1, MAX_GUILDBANK_SLOTS_PER_TAB do
---			index = mod(i, NUM_SLOTS_PER_GUILDBANK_GROUP);
---			if ( index == 0 ) then
---				index = NUM_SLOTS_PER_GUILDBANK_GROUP;
---			end
---			column = ceil((i-0.5)/NUM_SLOTS_PER_GUILDBANK_GROUP);
---			button = getglobal("GuildBankColumn"..column.."Button"..index);
---			button:SetID(i);
---			texture, count, locked = GetGuildBankItemInfo(tab, i);
---			SetItemButtonTexture(button, texture);
---			SetItemButtonCount(button, count);
---			SetItemButtonDesaturated(button, locked, 0.5, 0.5, 0.5);
---			button.count = count;
---			button.locked = locked;
---		end
-
 end
 
 function MTracker:ResetBagCount() 
@@ -356,7 +374,17 @@ function MTracker:ResetMailboxCount()
 		self.db.account.materials[k].ByPlayer[realmName][playerName].NbInMail=0;
 	end
 end
+function MTracker:ResetGBankCount(realmName, guildName,tab)
+	self:LevelDebug(mt_TRACE, "MTracker:ResetGBankCount enter");
+--	local playerName = MTracker_CurrentPlayer[1];
+--	local realmName = MTracker_CurrentPlayer[2];
+--	local guildName = GetGuildInfo("player");
 
+	for k,v in pairs(self.db.account.materials) do
+		self:LevelDebug(mt_TRACE, "key is "..k);
+		self.db.account.materials[k].ByGuild[realmName][guildName][tab].NbInGBank=0;
+	end
+end
 function MTracker:getLinkFromName(name)
 	if (name==nil) then return end;
 
@@ -436,7 +464,7 @@ function MTracker_HookTooltip(funcVars, retVal, frame, name, link, quality, coun
 		MTracker:LevelDebug(mt_TRACE, "MTracker_HookTooltip "..isNullOrValue(iName));
 
 		if (code and MTracker:ItemBeingTracked(code)) then	--checks if the code is valid, and also if the code is found in the mtracker database.
-			local nbInBag, nbInBank, nbInReroll, nbInMail = MTracker:getMaterialCounts(code);
+			local nbInBag, nbInBank, nbInReroll, nbInMail, nbInGuild = MTracker:getMaterialCounts(code);
 --			local price = MTracker_getMaterialDefaultPrice(code);
 
 			EnhTooltip.AddSeparator()
@@ -449,6 +477,8 @@ function MTracker_HookTooltip(funcVars, retVal, frame, name, link, quality, coun
 			EnhTooltip.AddLine("In Mail"..": "..nbInMail, nil, false);
 			EnhTooltip.LineColor(1,0.3,1);
 			EnhTooltip.AddLine("On Toons"..": "..nbInReroll, nil, false);
+			EnhTooltip.LineColor(1,0.3,1);
+			EnhTooltip.AddLine("In Guild"..": "..nbInGuild, nil, false);
 			EnhTooltip.LineColor(1,0.3,1);
 
 			--add used-in information
@@ -476,22 +506,28 @@ function MTracker:BuildUsedInString(UsedIntable)
 	return usedInString;
 end
 
-function MTracker:getMaterialCounts(code, player)
+function MTracker:getMaterialCounts(code, player, guildName, realmName)
 	if not code then return 0,0,0,0; end --should not happen, but just incase
 	if (not player) then player = MTracker_CurrentPlayer; end
-	
-	local tableNbArg = self.db.account.materials[code].ByPlayer[MTracker_CurrentPlayer[2]];
-	local nbInBag, nbInBank, nbInReroll, nbInMail = self:getMaterialCountsWithTable(tableNbArg, MTracker_CurrentPlayer[1]);
-	return nbInBag, nbInBank, nbInReroll, nbInMail;
+	if (not guildName) then guildName = GetGuildInfo("player"); end
+	if (not realmName) then realmName = MTracker_CurrentPlayer[2]; end
+
+	local tableNbArg = self.db.account.materials[code].ByPlayer[realmName];
+	local tableGNbArg = self.db.account.materials[code].ByGuild[realmName][guildName];
+
+	local nbInBag, nbInBank, nbInReroll, nbInMail, nbInGBank = self:getMaterialCountsWithTable(tableNbArg, tableGNbArg, MTracker_CurrentPlayer[1]);
+	return nbInBag, nbInBank, nbInReroll, nbInMail, nbInGBank;
 end
 
-function MTracker:getMaterialCountsWithTable(tableNbArg, playerName)
+
+function MTracker:getMaterialCountsWithTable(tableNbArg, tableGNbArg, playerName)
 	if (not playerName) then playerName = MTracker_CurrentPlayer[1]; end
 	
 	local nbInBank = 0;
 	local nbInReroll =0;
 	local nbInBag =0;
 	local nbInMail=0;
+	local nbInGBank=0
 	for name, bagTable in pairs (tableNbArg) do
 		if (name == playerName) then
 			nbInBag = bagTable["NbInBag"];
@@ -501,7 +537,10 @@ function MTracker:getMaterialCountsWithTable(tableNbArg, playerName)
 			nbInReroll = (bagTable["NbInBank"] + bagTable["NbInBag"] + bagTable["NbInMail"] + nbInReroll);
 		end
 	end
-	return nbInBag, nbInBank, nbInReroll, nbInMail;
+	for tabName, tagTable in pairs (tableGNbArg) do
+		nbInGBank=nbInGBank+tagTable["NbInGBank"];
+	end
+	return nbInBag, nbInBank, nbInReroll, nbInMail, nbInGBank;
 end
 
 function MTracker:UseTooltips_Update()
@@ -537,13 +576,23 @@ function MTracker:ShowCountsInChat(itemlink)
 			return;
 		end
 
-		self:Print("MaterialsTracker: "..itemlink.." on the following players");
+		self:Print(itemlink.." on the following players");
 		local players = self.db.account.players[realmName];
 		for playerName,v in pairs(players) do
 			local nbInBag = self.db.account.materials[code].ByPlayer[realmName][playerName].NbInBag;
 			local nbInBank = self.db.account.materials[code].ByPlayer[realmName][playerName].NbInBank;
 			local nbInMail = self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail;
 			self:Print(" "..playerName..": Bags="..nbInBag..", Bank="..nbInBank..", Mail="..nbInMail);
+		end
+		self:Print("");
+		self:Print(itemlink.." in the following guilds");
+		local tableGNbArg = self.db.account.materials[code].ByGuild[realmName];
+		for guildName, guildTable in pairs (tableGNbArg) do
+			local nbInGBank=0;
+			for tabName, tagTable in pairs (guildTable) do
+				nbInGBank=nbInGBank+tagTable["NbInGBank"];
+			end
+			self:Print( guildName..": "..nbInGBank);
 		end
 	end
 end

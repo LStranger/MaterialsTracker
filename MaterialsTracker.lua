@@ -460,9 +460,6 @@ function MTracker_HookTooltip(funcVars, retVal, frame, name, link, quality, coun
 --		local iName = GetItemInfo(link);
 
 		local code, iName = MTracker:GetNACFromLink(link);
-		MTracker:LevelDebug(mt_TRACE, "MTracker_HookTooltip "..code);
-		MTracker:LevelDebug(mt_TRACE, "MTracker_HookTooltip "..isNullOrValue(iName));
-
 		if (code and MTracker:ItemBeingTracked(code)) then	--checks if the code is valid, and also if the code is found in the mtracker database.
 			local nbInBag, nbInBank, nbInReroll, nbInMail, nbInGuild = MTracker:getMaterialCounts(code);
 --			local price = MTracker_getMaterialDefaultPrice(code);
@@ -528,17 +525,21 @@ function MTracker:getMaterialCountsWithTable(tableNbArg, tableGNbArg, playerName
 	local nbInBag =0;
 	local nbInMail=0;
 	local nbInGBank=0
-	for name, bagTable in pairs (tableNbArg) do
-		if (name == playerName) then
-			nbInBag = bagTable["NbInBag"];
-			nbInBank = bagTable["NbInBank"];
-			nbInMail = bagTable["NbInMail"];
-		else
-			nbInReroll = (bagTable["NbInBank"] + bagTable["NbInBag"] + bagTable["NbInMail"] + nbInReroll);
+	if (tableNbArg~=nil) then
+		for name, bagTable in pairs (tableNbArg) do
+			if (name == playerName) then
+				nbInBag = bagTable["NbInBag"];
+				nbInBank = bagTable["NbInBank"];
+				nbInMail = bagTable["NbInMail"];
+			else
+				nbInReroll = (bagTable["NbInBank"] + bagTable["NbInBag"] + bagTable["NbInMail"] + nbInReroll);
+			end
 		end
 	end
-	for tabName, tagTable in pairs (tableGNbArg) do
-		nbInGBank=nbInGBank+tagTable["NbInGBank"];
+	if (tableGNbArg~=nil) then
+		for tabName, tagTable in pairs (tableGNbArg) do
+			nbInGBank=nbInGBank+tagTable["NbInGBank"];
+		end
 	end
 	return nbInBag, nbInBank, nbInReroll, nbInMail, nbInGBank;
 end

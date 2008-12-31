@@ -20,4 +20,7 @@ libs\AceConsole-2.0\AceConsole-2.0.lua
 libs\AceEvent-2.0\AceEvent-2.0.lua
 libs\AceDebug-2.0\AceDebug-2.0.lua
 
+libs\LibStub\LibStub.lua
+libs\LibQTip-1.0\LibQTip-1.0.lua
+
 MaterialsTracker.lua

@@ -9,7 +9,7 @@
 ## X-RelSite-Curse: 3200
 ## SavedVariables: MaterialsTracker_Materials
 ## SavedVariablesPerCharacter: MaterialsTracker_PlayerConfig
-## OptionalDeps: EnhTooltip, Stubby, Ace2
+## OptionalDeps: Ace2
 ## X-Embeds: Ace2
 
 libs\AceLibrary\AceLibrary.lua
@@ -21,6 +21,8 @@ libs\AceEvent-2.0\AceEvent-2.0.lua
 libs\AceDebug-2.0\AceDebug-2.0.lua
 
 libs\LibStub\LibStub.lua
-libs\LibQTip-1.0\LibQTip-1.0.lua
+libs\LibExtraTip\LibExtraTip.lua
+libs\TipHelper\nTipHelper.lua
+libs\LibExtraTip\LibMoneyFrame.lua
 
 MaterialsTracker.lua

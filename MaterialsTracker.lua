@@ -15,6 +15,7 @@ local MTracker_MailScanInterval=60;	--time in seconds between mail scans.  appea
 --debug levels
 local mt_TRACE=2;
 local mt_INFO=1;
+local tooltip = LibStub("nTipHelper:1")
 
 MTracker = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceEvent-2.0", "AceDB-2.0", "AceDebug-2.0");
 MTracker:RegisterDB("MaterialsTracker_Materials", "MaterialsTracker_PlayerConfig");
@@ -112,9 +113,8 @@ function MTracker:OnEnable()
 	self:SetDebugging(false);
 
 	-- Hook in new tooltip code
-	if (IsAddOnLoaded("EnhTooltip") and IsAddOnLoaded("Stubby")) then
-		Stubby.RegisterFunctionHook("EnhTooltip.AddTooltip", 500, MTracker_HookTooltip)
-	end
+	tooltip:Activate();
+	tooltip:AddCallback( { type = "item", callback = MTracker_HookTooltip }, 500)
 
 	-- events
 	self:RegisterOurEvents();
@@ -477,8 +477,37 @@ function MTracker:getUsedIn(code)
 	return self.db.account.materials[code].UsedIn;
 end
 
+function MTracker_HookTooltip(tipFrame, item, count, name, link, quality)
+	if (MTracker_UseTooltips) then
+		tooltip:SetFrame(tipFrame)
 
-function MTracker_HookTooltip(funcVars, retVal, frame, name, link, quality, count)
+		local code, iName = MTracker:GetNACFromLink(link);
+		if (code and MTracker:ItemBeingTracked(code)) then	--checks if the code is valid, and also if the code is found in the mtracker database.
+			local nbInBag, nbInBank, nbInReroll, nbInMail, nbInGuild = MTracker:getMaterialCounts(code);
+--			local price = MTracker_getMaterialDefaultPrice(code);
+
+			tooltip:AddLine(" ", nil, false);
+			tooltip:SetColor(0,1,1);
+			tooltip:AddLine("MaterialTracker Info"..":", nil, false);
+			tooltip:SetColor(1,0.3,1);
+			tooltip:AddLine("In Bags"..": "..nbInBag, nil, false);
+			tooltip:AddLine("In Bank"..": "..nbInBank, nil, false);
+			tooltip:AddLine("In Mail"..": "..nbInMail, nil, false);
+			tooltip:AddLine("On Toons"..": "..nbInReroll, nil, false);
+			tooltip:AddLine("In Guild"..": "..nbInGuild, nil, false);
+
+			--add used-in information
+			tooltip:AddLine("Used By"..": "..MTracker:BuildUsedInString(MTracker:getUsedIn(code)), nil, false);
+			tooltip:AddLine(" ", nil, false);
+
+--			EnhTooltip.AddLine("Cost"..": "..ESell_Money_getStringFormatWithColor(priceUnite), nil, false);
+--			EnhTooltip.LineColor(1,0.3,1);
+		end
+	end
+
+end
+
+function MTracker_HookTooltip_old(funcVars, retVal, frame, name, link, quality, count)
 	if (MTracker_UseTooltips) then
 --		local code = MTracker:CodeFromLink(link);
 --		local iName = GetItemInfo(link);
@@ -571,15 +600,11 @@ end
 function MTracker:UseTooltips_Update()
 	--need to hook tooltip
 	if (MTracker_UseTooltips) then
-		if (IsAddOnLoaded("EnhTooltip") and IsAddOnLoaded("Stubby")) then
-			Stubby.UnregisterFunctionHook("EnhTooltip.AddTooltip", MTracker_HookTooltip)
-		end
+		tooltip:RemoveCallback(MTracker_HookTooltip);
 		MTracker_UseTooltips=false;
 		self:Print("MaterialsTracker: Tooltips disabled");
 	else
-		if (IsAddOnLoaded("EnhTooltip") and IsAddOnLoaded("Stubby")) then
-			Stubby.RegisterFunctionHook("EnhTooltip.AddTooltip", 500, MTracker_HookTooltip)
-		end
+		tooltip:AddCallback( { type = "item", callback = MTracker_HookTooltip }, 500)
 		MTracker_UseTooltips=true;
 		self:Print("MaterialsTracker: Tooltips enabled");
 	end

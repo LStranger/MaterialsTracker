@@ -22,7 +22,7 @@ libs\AceDebug-2.0\AceDebug-2.0.lua
 
 libs\LibStub\LibStub.lua
 libs\LibExtraTip\LibExtraTip.lua
-libs\TipHelper\nTipHelper.lua
 libs\LibExtraTip\LibMoneyFrame.lua
+libs\TipHelper\nTipHelper.lua
 
 MaterialsTracker.lua

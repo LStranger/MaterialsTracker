@@ -67,9 +67,9 @@ local defaultEnable = {
 
 -- Money Icon setup
 local iconpath = "Interface\\MoneyFrame\\UI-"
-local goldicon = "%d|T"..iconpath.."GoldIcon:%d:%d:2:0|t"
-local silvericon = "%s|T"..iconpath.."SilverIcon:%d:%d:2:0|t"
-local coppericon = "%s|T"..iconpath.."CopperIcon:%d:%d:2:0|t"
+local goldicon = "%d|T"..iconpath.."GoldIcon:0|t"
+local silvericon = "%s|T"..iconpath.."SilverIcon:0|t"
+local coppericon = "%s|T"..iconpath.."CopperIcon:0|t"
 
 -- Function that calls all the interested tooltips
 local function ProcessCallbacks(reg, tiptype, tooltip, ...)
@@ -201,6 +201,7 @@ local function OnTooltipCleared(tooltip)
 	assert(reg, "Unknown tooltip passed to LibExtraTip:OnTooltipCleared()")
 	--print("tooltip cleared",reg.ignoreOnCleared)
 	if reg.ignoreOnCleared then return end
+	tooltip:SetFrameLevel(1)
 	
 	if reg.extraTip then
 		table.insert(self.extraTippool, reg.extraTip)
@@ -455,31 +456,28 @@ end
 	Creates a string representation of the money value passed using embedded textures for the icons
 	@param money the money value to be converted in copper
 	@param concise when false (default), the representation of 1g is "1g 00s 00c" when true, it is simply "1g" (optional)
-	@param textSize indicates the size of the font in which the string will be used.  When omitted, the coins use default sizing (this usually ends up making them appear too small)
 	@since 1.0
 ]]
-function lib:GetMoneyText(money, concise, textSize)
-	local size = textSize and textSize * 1.4 or 0
-		
+function lib:GetMoneyText(money, concise)
 	local g = math.floor(money / 10000)
 	local s = math.floor(money % 10000 / 100)
 	local c = math.floor(money % 100)
 	
 	local moneyText = ""
 	
-	local f = false
+	local sep, fmt = "", "%d"
 	if g > 0 then
-		moneyText = goldicon:format(g,size,size)
-		f = true
+		moneyText = goldicon:format(g)
+		sep, fmt = " ", "%02d"
 	end
 	
-	if s > 0 or (concise and f and c > 0) or (not concise and f) then
-		moneyText = moneyText..(f and " " or "")..silvericon:format(f and "%02d" or "%d",size,size):format(s)
-		f = true
+	if s > 0 or (money >= 10000 and (concise and c > 0) or not concise) then
+		moneyText = moneyText..sep..silvericon:format(fmt):format(s)
+		sep, fmt = " ", "%02d"
 	end
 	
-	if not concise or c > 0 or not f then
-		moneyText = moneyText .. (f and " " or "")..coppericon:format(f and "%02d" or "%d",size,size):format(c)
+	if not concise or c > 0 or money < 100 then
+		moneyText = moneyText..sep..coppericon:format(fmt):format(c)
 	end
 	
 	return moneyText
@@ -495,31 +493,25 @@ end
 	@param g green component of the tooltip line color (optional)
 	@param b blue component of the tooltip line color (optional)
 	@param embed override the lib's embedMode setting (optional)
+	@param concise specify if concise money mode is to be used (optional)
 	@see SetEmbedMode
 	@since 1.0
 ]]
-function lib:AddMoneyLine(tooltip,text,money,r,g,b,embed)
+function lib:AddMoneyLine(tooltip,text,money,r,g,b,embed,concise)
 	local reg = self.tooltipRegistry[tooltip]
 	assert(reg, "Unknown tooltip passed to LibExtraTip:AddMoneyLine()")
 	
 	if r and not g then embed = r r = nil end
 	embed = embed ~= nil and embed or self.embedMode
 	
-	local textHeight,_
-	if embed then
-		-- This is kind of a hack, but it appears to work pretty well
-		local line = reg.fontTestLine or getglobal(tooltip:GetName() .. "TextLeft2")
-		reg.fontTestLine = line
-			
-		if line then 
-			_,textHeight = line:GetFont()
-		end
+	local moneyText = self:GetMoneyText(money, concise)
+
+	if not embed then
+		reg.extraTip:AddDoubleLine(text,moneyText,r,g,b,1,1,1)
+		reg.extraTipUsed = true
 	else
-		_,textHeight = GameFontNormalSmall:GetFont()
-	end		
-	
-	local moneyText = self:GetMoneyText(money,nil,textHeight)
-	self:AddDoubleLine(tooltip,text,moneyText,r,g,b,1,1,1,embed)
+		tooltip:AddDoubleLine(text,moneyText,lr,lg,lb,1,1,1)
+	end
 end
 
 --[[-
@@ -638,7 +630,7 @@ function lib:GenerateTooltipMethodTable() -- Sets up hooks to give the quantity 
 		-- Default enabled events
 
 		SetAuctionItem = function(self,reg,type,index)
-			local _,_,q,cu,min,inc,bo,ba,hb,own = GetAuctionItemInfo(type,index)
+			local _,_,q,_,cu,_ ,min,inc,bo,ba,hb,own = GetAuctionItemInfo(type,index)
 			reg.quantity = q
 			reg.additional.event = "SetAuctionItem"
 			reg.additional.eventType = type
@@ -856,11 +848,13 @@ function lib:GenerateTooltipMethodTable() -- Sets up hooks to give the quantity 
 		end,
 
 		SetSpell = function(self,reg,index,type)
-			reg.additional.event = "SetSpell"
-			reg.additional.eventIndex = index
-			reg.additional.eventType = type
 			local link = GetSpellLink(index, type)
-			SetSpellDetail(reg, link)
+			if link then
+				reg.additional.event = "SetSpell"
+				reg.additional.eventIndex = index
+				reg.additional.eventType = type
+				SetSpellDetail(reg, link)
+			end
 		end,
 
 		SetTalent = function(self, reg, type, index)
@@ -907,7 +901,7 @@ function lib:GenerateTooltipMethodTable() -- Sets up hooks to give the quantity 
 end
 
 do -- ExtraTip "class" definition
-	local methods = {"InitLines","Attach","Show","MatchSize","Release","NeedsRefresh"}
+	local methods = {"InitLines","Attach","Show","MatchSize","Release","NeedsRefresh","SetParentClamp"}
 	local scripts = {"OnShow","OnHide","OnSizeChanged"}
 	local numTips = 0
 	local class = {}
@@ -942,6 +936,7 @@ do -- ExtraTip "class" definition
 	end
 
 	function class:Attach(tooltip)
+		if self.parent then self:SetParentClamp(0) end
 		self.parent = tooltip
 		self:SetParent(tooltip)
 		self:SetOwner(tooltip,"ANCHOR_NONE")
@@ -949,6 +944,7 @@ do -- ExtraTip "class" definition
 	end
 
 	function class:Release()
+		if self.parent then self:SetParentClamp(0) end
 		self.parent = nil
 		self:SetParent(nil)
 		self.minWidth = 0
@@ -994,22 +990,26 @@ do -- ExtraTip "class" definition
 		end
 	end
 
-	function class:OnSizeChanged(w,h)
+	function class:SetParentClamp(h)
 		local p = self.parent
 		if not p then return end
 		local l,r,t,b = p:GetClampRectInsets()
-		p:SetClampRectInsets(l,r,t,-h) -- should that be b-h?  Is playing nice even needed? Anyone who needs to mess with the bottom clamping inset will probably interfere with us anyway, right?
+		p:SetClampRectInsets(l,r,t,-h)
 		self:NeedsRefresh(true)
 	end
 
+	function class:OnShow()
+		self:SetParentClamp(self:GetHeight())
+	end
+	
+	function class:OnSizeChanged(w,h)
+		self:SetParentClamp(h)
+	end
+
 	function class:OnHide()
-		local p = self.parent
-		if not p then return end
-		local l,r,t,b = p:GetClampRectInsets()
-		p:SetClampRectInsets(l,r,t,0)
+		self:SetParentClamp(0)
 	end
 		
-
 	-- The right-side text is statically positioned to the right of the left-side text.
 	-- As a result, manually changing the width of the tooltip causes the right-side text to not be in the right place.
 	local function fixRight(tooltip,lefts,rights)
@@ -1021,14 +1021,20 @@ do -- ExtraTip "class" definition
 			ln = name .. "TextLeft"
 		end
 		for i=1,tooltip:NumLines() do
-			if not lefts then
+			left = nil
+			right = nil
+
+			if lefts then left = lefts[i] end
+			if rights then right = rights[i] end
+			
+			if not left then
 				left = getglobal(ln..i)
-				right = getglobal(rn..i)
-			else
-				left = lefts[i]
-				right = rights[i]
 			end
-			if right:IsVisible() then
+			if not right then
+				right = getglobal(rn..i)
+			end
+
+			if right and right:IsVisible() then
 				right:ClearAllPoints()
 				right:SetPoint("LEFT",left,"RIGHT")
 				right:SetPoint("RIGHT",-10,0)
@@ -1042,11 +1048,11 @@ do -- ExtraTip "class" definition
 		local pw = p:GetWidth()
 		local w = self:GetWidth()
 		local d = pw - w
-		if d > .2 then
+		if d > .005 then
 			self.sizing = true
 			self:SetWidth(pw)
 			fixRight(self,self.left,self.right)
-		elseif d < -.2 then
+		elseif d < -.005 then
 			self.sizing = true
 			p:SetWidth(w)
 			fixRight(p)
@@ -1090,3 +1096,30 @@ end)
 
 -- Test Code ]]-----------------------------------------------------
 
+--[[ Debugging code
+local f = {"AddDoubleLine", "AddFontStrings", "AddLine", "AddTexture", "AppendText", "ClearLines", "FadeOut", "GetAnchorType", "GetItem", "GetSpell", "GetOwner", "GetUnit", "IsUnit", "NumLines", "SetAction", "SetAuctionCompareItem", "SetAuctionItem", "SetAuctionSellItem", "SetBagItem", "SetBuybackItem", "SetCraftItem", "SetCraftSpell", "SetCurrencyToken", "SetGuildBankItem", "SetHyperlink", "SetInboxItem", "SetInventoryItem", "SetLootItem", "SetLootRollItem", "SetMerchantCompareItem", "SetMerchantItem", "SetMinimumWidth", "SetOwner", "SetPadding", "SetPetAction", "SetPlayerBuff", "SetQuestItem", "SetQuestLogItem", "SetQuestLogRewardSpell", "SetQuestRewardSpell", "SetSendMailItem", "SetShapeshift", "SetSpell", "SetTalent", "SetText", "SetTracking", "SetTradePlayerItem", "SetTradeSkillItem", "SetTradeTargetItem", "SetTrainerService", "SetUnit", "SetUnitAura", "SetUnitBuff", "SetUnitDebuff"}
+
+for _,k in ipairs(f) do
+	print("Hooking ", k)
+	local h = GameTooltip[k]
+	GameTooltip[k] = function(...)
+	    local t
+	    for i=2,5 do
+			if not t then
+				t = debugstack(i,1,0):gsub("\n[.\s\n]*", ""):gsub(": in function.*", "")
+				if not t:match("Interface\\") then t = nil
+				else t = t:gsub("Interface\\", "") end
+			end
+		end
+		if t then
+			print(t..": "..k.."(", ..., ")")
+		elseif true then
+			print("-------");
+			print(debugstack());
+			print("Call to: "..k.."(", ..., ")")
+			print("-------");
+		end
+		return h(...)
+	end
+end
+--]]

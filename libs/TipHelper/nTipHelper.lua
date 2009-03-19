@@ -106,18 +106,34 @@ do -- tooltip class definition
 	local GSC_2 = "|cff%s%d|cff000000.|cff%s%02d|r"
 	local GSC_1 = "|cff%s%d|r"
 
-	local function coins(money)
+	local iconpath = "Interface\\MoneyFrame\\UI-"
+	local goldicon = "%d|T"..iconpath.."GoldIcon:0|t"
+	local silvericon = "%s|T"..iconpath.."SilverIcon:0|t"
+	local coppericon = "%s|T"..iconpath.."CopperIcon:0|t"
+
+
+	local function coins(money, graphic)
 		money = math.floor(tonumber(money) or 0)
 		local g = math.floor(money / 10000)
 		local s = math.floor(money % 10000 / 100)
 		local c = money % 100
 
-		if g > 0 then
-			return GSC_3:format(GOLD, g, SILVER, s, COPPER, c)
-		elseif s > 0 then
-			return GSC_2:format(SILVER, s, COPPER, c)
+		if not graphic then
+			if g > 0 then
+				return GSC_3:format(GOLD, g, SILVER, s, COPPER, c)
+			elseif s > 0 then
+				return GSC_2:format(SILVER, s, COPPER, c)
+			else
+				return GSC_1:format(COPPER, c)
+			end
 		else
-			return GSC_1:format(COPPER, c)
+			if g > 0 then
+				return goldicon:format(g)..silvericon:format("%02d"):format(s)..coppericon:format("%02d"):format(c)
+			elseif s > 0  then
+				return silvericon:format("%d"):format(s)..coppericon:format("%02d"):format(c)
+			else
+				return coppericon:format("%d"):format(c)
+			end
 		end
 	end
 
@@ -273,8 +289,8 @@ do -- tooltip class definition
 	end
 
 	-- Gets money as colorized text
-	function lib:Coins(amount)
-		return coins(amount)
+	function lib:Coins(amount, graphic)
+		return coins(amount, graphic)
 	end
 
 	--[[

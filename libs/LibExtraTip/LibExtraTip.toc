@@ -1,10 +1,10 @@
 ## Title: LibExtraTip
 ## Notes: Assists in the management of additional tooltip information.
 ##
-## Interface: 30000
+## Interface: 30100
 ## LoadOnDemand: 0
 ##
 ## Version: 1.0
-## Revision: $Id: LibExtraTip.toc 143 2008-11-05 13:05:42Z Norganna $
+## Revision: $Id: LibExtraTip.toc 209 2009-04-14 19:51:51Z aesir $
 ##
 Load.xml

@@ -207,6 +207,7 @@ local function OnTooltipCleared(tooltip)
 		table.insert(self.extraTippool, reg.extraTip)
 		reg.extraTip:Hide()
 		reg.extraTip:Release()
+		reg.extraTip:SetHeight(0)
 		reg.extraTip = nil
 	end
 	reg.extraTipUsed = nil

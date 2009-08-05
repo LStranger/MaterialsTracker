@@ -1,8 +1,8 @@
-## Interface: 30100
+## Interface: 30200
 ## Title: MaterialsTracker 
 ## Notes: Provides information of tradeskill and crafting materials that are in the banks and bags of your characters.
 ## Author: Shamino
-## Version: 30100.01
+## Version: 30200.01
 ## X-Category: Inventory
 ## X-Website: http://www.curse-gaming.com/en/files/details/3200/materialstracker/
 ## X-RelSite-WoWI: 6237

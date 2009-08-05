@@ -189,7 +189,7 @@ do -- tooltip class definition
 			enchant = tonumber(enchant) or 0
 			suffix = tonumber(suffix) or 0
 			seed = tonumber(seed) or 0
-			factor = lib.GetFactor(suffix, seed)
+			factor = lib:GetFactor(suffix, seed)
 		elseif (vartype == "number") then
 			lType,id, suffix,factor,enchant,seed, gem1,gem2,gem3,gemBonus =
 				"item",link, 0,0,0,0, 0,0,0,0

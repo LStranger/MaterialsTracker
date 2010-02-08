@@ -423,11 +423,21 @@ end
 	@since 1.0
 ]]
 function lib:RemoveCallback(callback)
-	if not (self.callbacks and self.callbacks[callback]) then return end
+	if not (callback and self.callbacks) then return end
+	if not self.callbacks[callback] then
+		-- backward compatibility for old 'function' style AddCallback and RemoveCallback
+		for options, priority in pairs(self.callbacks) do
+			if options.callback == callback then
+				callback = options
+				break
+			end
+		end
+		if not self.callbacks[callback] then return end
+	end
 	self.callbacks[callback] = nil
-	for i,c in ipairs(self.sortedCallbacks) do
-		if c == callback then
-			table.remove(self.sortedCallbacks,i)
+	for index,options in ipairs(self.sortedCallbacks) do
+		if options == callback then
+			table.remove(self.sortedCallbacks, index)
 			return true
 		end
 	end
@@ -885,25 +895,25 @@ function lib:GenerateTooltipMethodTable() -- Sets up hooks to give the quantity 
 
 		-- Default disabled events:
 
-		SetAction = function(self,actionid)
-			OnTooltipCleared(self)
-			local reg = tooltipRegistry[self]
-			reg.ignoreOnCleared = true
-			local t,id,sub = GetActionInfo(actionid)
-			reg.additional.event = "SetAction"
-			reg.additional.eventIndex = actionid
-			reg.additional.actionType = t
-			reg.additional.actionIndex = id
-			reg.additional.actionSubtype = subtype
-			if t == "item" then
-				reg.quantity = GetActionCount(actionid)
-			elseif t == "spell" then
-				if id and id > 0 then
-					local link = GetSpellLink(id, sub)
-					SetSpellDetail(reg, link)
-				end
-			end
-		end,
+--		SetAction = function(self,actionid)
+--			OnTooltipCleared(self)
+--			local reg = tooltipRegistry[self]
+--			reg.ignoreOnCleared = true
+--			local t,id,sub = GetActionInfo(actionid)
+--			reg.additional.event = "SetAction"
+--			reg.additional.eventIndex = actionid
+--			reg.additional.actionType = t
+--			reg.additional.actionIndex = id
+--			reg.additional.actionSubtype = subtype
+--			if t == "item" then
+--				reg.quantity = GetActionCount(actionid)
+--			elseif t == "spell" then
+--				if id and id > 0 then
+--					local link = GetSpellLink(id, sub)
+--					SetSpellDetail(reg, link)
+--				end
+--			end
+--		end,
 
 		SetAuctionCompareItem = function(self, type, index, offset)
 			OnTooltipCleared(self)
@@ -1074,7 +1084,7 @@ function lib:GenerateTooltipMethodTable() -- Sets up hooks to give the quantity 
 			end
 		end,
 
-		SetAction = posthookClearIgnore,
+--		SetAction = posthookClearIgnore,
 		SetAuctionCompareItem = posthookClearIgnore,
 		SetCurrencyToken = posthookClearIgnore,
 		SetMerchantCompareItem = posthookClearIgnore,
@@ -1125,8 +1135,8 @@ do -- ExtraTip "class" definition
 			o:SetScript(script,self[script])
 		end
 
-		o.left = setmetatable({name = o:GetName().."TextLeft"},line_mt)
-		o.right = setmetatable({name = o:GetName().."TextRight"},line_mt)
+		o.Left = setmetatable({name = o:GetName().."TextLeft"},line_mt)
+		o.Right = setmetatable({name = o:GetName().."TextRight"},line_mt)
 		return o
 	end
 
@@ -1150,7 +1160,7 @@ do -- ExtraTip "class" definition
 		local changedLines = self.changedLines
 		if not changedLines or changedLines < n then
 			for i = changedLines or 1,n do
-				local left,right = self.left[i],self.right[i]
+				local left,right = self.Left[i],self.Right[i]
 				local font
 				if i == 1 then
 					font = GameFontNormal
@@ -1207,33 +1217,26 @@ do -- ExtraTip "class" definition
 
 	-- The right-side text is statically positioned to the right of the left-side text.
 	-- As a result, manually changing the width of the tooltip causes the right-side text to not be in the right place.
-	local function fixRight(tooltip,lefts,rights)
-		local name,rn,ln,left,right
-		local getglobal = getglobal
-		if not lefts then
-			name = tooltip:GetName()
-			rn = name .. "TextRight"
-			ln = name .. "TextLeft"
+	local function fixRight(tooltip, shift)
+		local rights, rightname
+		rights = tooltip.Right
+		if not rights then
+			rightname = tooltip:GetName().."TextRight"
 		end
-		for i=1,tooltip:NumLines() do
-			left = nil
-			right = nil
-
-			if lefts then left = lefts[i] end
-			if rights then right = rights[i] end
-
-			if not left then
-				left = getglobal(ln..i)
+		for line = 1, tooltip:NumLines() do
+			local right
+			if rights then
+				right = rights[line]
+			else
+				right = _G[rightname..line]
 			end
-			if not right then
-				right = getglobal(rn..i)
-			end
-
 			if right and right:IsVisible() then
-				right:ClearAllPoints()
-				right:SetPoint("LEFT",left,"RIGHT")
-				right:SetPoint("RIGHT",-10,0)
-				right:SetJustifyH("RIGHT")
+				for index = 1, right:GetNumPoints() do
+					local point, relativeTo, relativePoint, xofs, yofs = right:GetPoint(index)
+					if xofs then
+						right:SetPoint(point, relativeTo, relativePoint, xofs + shift, yofs)
+					end
+				end
 			end
 		end
 	end
@@ -1246,11 +1249,11 @@ do -- ExtraTip "class" definition
 		if d > .005 then
 			self.sizing = true
 			self:SetWidth(pw)
-			fixRight(self,self.left,self.right)
+			fixRight(self, d)
 		elseif d < -.005 then
 			self.sizing = true
 			p:SetWidth(w)
-			fixRight(p)
+			fixRight(p, -d)
 		end
 	end
 

@@ -1,5 +1,5 @@
-MATERIALSTRACKER_VERSION = "30200.01";
-MATERIALSTRACKER_DB_VERSION = 30001;
+MATERIALSTRACKER_VERSION = "40000.01";
+MATERIALSTRACKER_DB_VERSION = 40001;
 
 --runtime variables
 local MTracker_BankIsOpen = false;
@@ -17,110 +17,168 @@ local mt_TRACE=2;
 local mt_INFO=1;
 local tooltip = LibStub("nTipHelper:1")
 
-MTracker = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceEvent-2.0", "AceDB-2.0", "AceDebug-2.0");
-MTracker:RegisterDB("MaterialsTracker_Materials", "MaterialsTracker_PlayerConfig");
-MTracker:RegisterDefaults("account", {
-    materials = {
-	['*'] = {
-		tracked=false,
-		ByPlayer = {
-			['*'] = {	--realm
-				['*'] = {	--playername
-					NbInMail=0,
-					NbInBank=0,
-					NbInBag=0,
+MTracker = LibStub("AceAddon-3.0"):NewAddon("MTracker", "AceConsole-3.0", "AceEvent-3.0")
+MEvent = AceLibrary("AceAddon-2.0"):new("AceEvent-2.0");
+MDebug = AceLibrary("AceAddon-2.0"):new("AceDebug-2.0");
+local AceConfig = LibStub("AceConfig-3.0");
+
+
+local MTracker = _G.MTracker
+local MDebug = _G.MDebug
+
+local materialsDefault = {
+	global = {
+		materials = {
+			['**'] = {
+				tracked=false,
+				ByPlayer = {
+					['*'] = {	--realm
+						['*'] = {	--playername
+							NbInMail=0,
+							NbInBank=0,
+							NbInBag=0,
+						},
+					},
+				},
+				ByGuild = {
+					['*'] = {	--realm
+						['*'] = {	--guild
+							['*'] = {	--tabname
+								NbInGBank=0,
+							}
+						},
+					},
+				},
+				UsedIn = {
+					['*'] = false,
 				},
 			},
 		},
-		ByGuild = {
-			['*'] = {	--realm
-				['*'] = {	--guild
-					['*'] = {	--tabname
-						NbInGBank=0,
-					}
-				},
-			},
+		players = {},
+	}
+}
+local configDefault = {
+	global = {
+		config = {
+			DBVersion=0,   
 		},
-		UsedIn = {
-			['*'] = false,
+	}
+}
+
+--self:RegisterChatCommand({"/mtracker"},
+MTrackerOptionsTable = {
+	type = "group",
+	args = {
+		resetdata = {
+			type = "execute",
+			name = "reset to the default config",
+			desc = "reset",
+			func = function() MTracker.db:ResetDB(); end,
 		},
-	},
-    },
-    players = {},
-    config = {
-	DBVersion=0,   
-    },
-} )
+		tooltips = {
+			type = "execute",
+			name = "update the usage of tooltips",
+			desc = "reset",
+			func = function() MTracker:UseTooltips_Update(); end,
+		},
+		item = {
+			type = "input",
+			name = "item",
+			desc = "list item counts",
+			usage = "<itemlink>",
+			get = false,
+			set = function(info,v) MTracker:ShowCountsInChat(info,v); end,
+		},
+		additem = {
+			type = "input",
+			name = "additem",
+			desc = "add an item to the database",
+			usage = "<itemlink>",
+			get = false,
+			set = function(info,v) MTracker:AddItem(info,v); end,
+		},
+		debugLevel = {
+			type = "input",
+			name = "debugLevel",
+			desc = "change debug level.  1=INFO, 2=TRACE",
+			usage = "<level>",
+			get = false,
+			set = function(info,v) MDebug:SetDebugLevel(tonumber(v)); end,
+		},
+	}
+}
+--	"MATERIALSTRACKER"
+--);
 
 function MTracker:OnInitialize()
 	--Setup our chat command interface
-	self:RegisterChatCommand({"/mtracker"},
-		{
-			type = "group",
-			args = {
-				resetdata = {
-					type = "execute",
-					name = "reset to the default config",
-					desc = "reset",
-			    	      	func = function() self:ResetDB(); end,
-				},
-				tooltips = {
-					type = "execute",
-					name = "reset to the default config",
-					desc = "reset",
-			    	      	func = function() self:UseTooltips_Update(); end,
-				},
-				item = {
-					type = "text",
-					name = "item",
-					desc = "list item counts",
-					usage = "<itemlink>",
-					get = false,
-			    	      	set = function(v) self:ShowCountsInChat(v); end,
-				},
-				additem = {
-					type = "text",
-					name = "additem",
-					desc = "add an item to the database",
-					usage = "<itemlink>",
-					get = false,
-			    	      	set = function(v) self:AddItem(v); end,
-				},
-				debugLevel = {
-					type = "text",
-					name = "debugLevel",
-					desc = "change debug level.  1=INFO, 2=TRACE",
-					usage = "<level>",
-					get = false,
-			    	      	set = function(v) self:SetDebugLevel(tonumber(v)); end,
-				},
-			}
-		},
-		"MATERIALSTRACKER"
-	);
-	
-	if (not self.db.account.materials) then
-		self:Print("creating materials table");
---		self.db.account.materials={};
-		self:ResetDB();
-	end
+	AceConfig:RegisterOptionsTable("MTracker", MTrackerOptionsTable, {"mtracker"})
+
+--	self:RegisterChatCommand({"/mtracker"},
+--		{
+--			type = "group",
+--			args = {
+--				resetdata = {
+--					type = "execute",
+--					name = "reset to the default config",
+--					desc = "reset",
+--			    	      	func = function() MTracker.db:ResetDB(); end,
+--				},
+--				tooltips = {
+--					type = "execute",
+--					name = "update the usage of tooltips",
+--					desc = "reset",
+--			    	      	func = function() MTracker:UseTooltips_Update(); end,
+--				},
+--				item = {
+--					type = "text",
+--					name = "item",
+--					desc = "list item counts",
+--					usage = "<itemlink>",
+--					get = false,
+--			    	      	set = function(v) MTracker:ShowCountsInChat(v); end,
+--				},
+--				additem = {
+--					type = "text",
+--					name = "additem",
+--					desc = "add an item to the database",
+--					usage = "<itemlink>",
+--					get = false,
+--			    	      	set = function(v) MTracker:AddItem(v); end,
+--				},
+--				debugLevel = {
+--					type = "text",
+--					name = "debugLevel",
+--					desc = "change debug level.  1=INFO, 2=TRACE",
+--					usage = "<level>",
+--					get = false,
+--			    	      	set = function(v) MTracker:SetDebugLevel(tonumber(v)); end,
+--				},
+--			}
+--		},
+--		"MATERIALSTRACKER"
+--	);
+	local acedb = LibStub:GetLibrary("AceDB-3.0")
+	MTracker.db = acedb:New("MTrackerDB", materialsDefault, true);
+	MTracker.dbconfig = acedb:New("MTrackerConfigDB", configDefault, true);
+--	MTracker.db = acedb:New("MTrackerPerCharDB", materialsDefault, true);
 
 	MTracker_CurrentPlayer = {UnitName("player"), GetCVar("realmName")};
-	self:CheckDatabaseVersion();
+	MTracker:CheckDatabaseVersion();
 end
 
 function MTracker:OnEnable()
-	self:SetDebugging(false);
+	MDebug:SetDebugging(false);
 
 	-- Hook in new tooltip code
 	tooltip:Activate();
 	tooltip:AddCallback( { type = "item", callback = MTracker_HookTooltip }, 500)
 
 	-- events
-	self:RegisterOurEvents();
+	MTracker:RegisterOurEvents();
 	------------------
 
-	self:AddUserToPlayerTable();
+	MTracker:AddUserToPlayerTable();
 end
 
 function MTracker:AddUserToPlayerTable()
@@ -128,30 +186,30 @@ function MTracker:AddUserToPlayerTable()
 	local realmName = MTracker_CurrentPlayer[2];
 	
 	--create the realm table if it does not yet exist.
-	if (not self.db.account.players[realmName]) then
-		self.db.account.players[realmName]={};
+	if (not MTracker.db.global.players[realmName]) then
+		MTracker.db.global.players[realmName]={};
 	end
-	if (not self.db.account.players[realmName][playerName]) then
-		self.db.account.players[realmName][playerName]=1;
+	if (not MTracker.db.global.players[realmName][playerName]) then
+		MTracker.db.global.players[realmName][playerName]=1;
 	end
 end
 
 function MTracker:RegisterOurEvents()
-	self:RegisterEvent("BAG_UPDATE", "UpdateNumberInBag");
-	self:RegisterEvent("TRADE_SKILL_SHOW", "UpdateTradeSkillsSavedMaterials");
-	self:RegisterEvent("BANKFRAME_OPENED", "BankIsOpened");
-	self:RegisterEvent("BANKFRAME_CLOSED", "BankIsClosed");
-	self:RegisterEvent("MAIL_SHOW", "MailboxIsOpened");
-	self:RegisterEvent("MAIL_CLOSED", "MailboxIsClosed");
-	self:RegisterEvent("MAIL_INBOX_UPDATE", "MailInboxUpdate");
-	self:RegisterEvent("GUILDBANKFRAME_OPENED", "GuildBankIsOpened");
-	self:RegisterEvent("GUILDBANKFRAME_CLOSED", "GuildBankIsClosed");
-	self:RegisterEvent("GUILDBANKBAGSLOTS_CHANGED", "UpdateNumberInGuildBank");
+	MTracker:RegisterEvent("BAG_UPDATE", "UpdateNumberInBag");
+	MTracker:RegisterEvent("TRADE_SKILL_SHOW", "UpdateTradeSkillsSavedMaterials");
+	MTracker:RegisterEvent("BANKFRAME_OPENED", "BankIsOpened");
+	MTracker:RegisterEvent("BANKFRAME_CLOSED", "BankIsClosed");
+	MTracker:RegisterEvent("MAIL_SHOW", "MailboxIsOpened");
+	MTracker:RegisterEvent("MAIL_CLOSED", "MailboxIsClosed");
+	MTracker:RegisterEvent("MAIL_INBOX_UPDATE", "MailInboxUpdate");
+	MTracker:RegisterEvent("GUILDBANKFRAME_OPENED", "GuildBankIsOpened");
+	MTracker:RegisterEvent("GUILDBANKFRAME_CLOSED", "GuildBankIsClosed");
+	MTracker:RegisterEvent("GUILDBANKBAGSLOTS_CHANGED", "UpdateNumberInGuildBank");
 end
 
 function MTracker:BankIsOpened()
 	MTracker_BankIsOpen = true;
-	self:UpdateNumberInBank();
+	MTracker:UpdateNumberInBank();
 end
 function MTracker:BankIsClosed()
 	MTracker_BankIsOpen = false;
@@ -165,32 +223,32 @@ function MTracker:MailboxIsClosed()
 end
 function MTracker:MailInboxUpdate()
 	if ((GetTime()-MTracker_LastMailScan) > MTracker_MailScanInterval) then
-		self:UpdateNumberInMailbox();
+		MTracker:UpdateNumberInMailbox();
 	end
 end
 
 function MTracker:GuildBankIsOpened()
 	MTracker_GuildBankIsOpen = true;
---	self:UpdateNumberInGuildBank();
+--	MTracker:UpdateNumberInGuildBank();
 end
 function MTracker:GuildBankIsClosed()
 	MTracker_GuildBankIsOpen = false;
 end
 
 function MTracker:UpdateTradeSkillsSavedMaterials()
-	self:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillsSavedMaterials enter");
+	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillsSavedMaterials enter");
 
 	local tradeSkill = GetTradeSkillLine();
-	self:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillsSavedMaterials tradeSkill opened is "..isNullOrValue(tradeSkill));
+	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillsSavedMaterials tradeSkill opened is "..isNullOrValue(tradeSkill));
 
 	--TODO: create table in localization file and check that tradeSkill is in there.
 	if (tradeSkill~=nil) then
-		self:UpdateTradeSkillSavedMaterials(tradeSkill);
+		MTracker:UpdateTradeSkillSavedMaterials(tradeSkill);
 	end
 end
 
 function MTracker:UpdateNumberInMailbox()
-	self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox enter");
+	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox enter");
 
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
@@ -202,21 +260,21 @@ function MTracker:UpdateNumberInMailbox()
 		MTracker_MailUpdatesInProgress=true;
 		MTracker_LastMailScan=GetTime();	--GetTime is seconds that my computer has been running.
 
-		self:ResetMailboxCount();
+		MTracker:ResetMailboxCount();
 				
 		local nbr = GetInboxNumItems();
 		for mailItem=1, nbr, 1 do
 			for attachment=1, ATTACHMENTS_MAX_RECEIVE, 1 do
 				local name, itemTexture, count, quality, canUse = GetInboxItem(mailItem, attachment);
-				self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox itemName is "..isNullOrValue(name));
+				MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox itemName is "..isNullOrValue(name));
 
 				if (name~= nil) then
-					local code = self:getCodeFromName(name);
---					if (code and self.db.account.materials[code].tracked) then
-					if (code and self:ItemBeingTracked(code)) then
-						self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox code is "..isNullOrValue(code));
-						self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail = 
-							(count + self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail);
+					local code = MTracker:getCodeFromName(name);
+--					if (code and MTracker.db.global.materials[code].tracked) then
+					if (code and MTracker:ItemBeingTracked(code)) then
+						MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox code is "..isNullOrValue(code));
+						MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInMail = 
+							(count + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInMail);
 					end
 				end
 			end
@@ -227,45 +285,45 @@ function MTracker:UpdateNumberInMailbox()
 end
 
 function MTracker:UpdateNumberInBag()
-	self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBag enter");
+	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBag enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
 	--reset bag count for this player
-	self:ResetBagCount();
+	MTracker:ResetBagCount();
 
 	for bag=0, MTracker_NUMBER_OF_BAG_SLOTS, 1 do
 		for slot=1, GetContainerNumSlots(bag), 1 do
 			local itemLink = GetContainerItemLink(bag,slot);
 			if(itemLink) then	--bag slot is empty.
---				local itemName = self:NameFromLink(itemLink);
---				local code = self:CodeFromLink(itemLink);	--the code is the key to the material
+--				local itemName = MTracker:NameFromLink(itemLink);
+--				local code = MTracker:CodeFromLink(itemLink);	--the code is the key to the material
 
-				local code, itemName = self:GetNACFromLink(itemLink);
-				self:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag itemName is "..isNullOrValue(itemName));
-				self:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag code is "..isNullOrValue(code));
+				local code, itemName = MTracker:GetNACFromLink(itemLink);
+				MDebug:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag itemName is "..isNullOrValue(itemName));
+				MDebug:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag code is "..isNullOrValue(code));
 
-				if (code and self:ItemBeingTracked(code)) then
+				if (code and MTracker:ItemBeingTracked(code)) then
 					local texture, itemCount, locked, quality, readable = GetContainerItemInfo(bag,slot);
-					self.db.account.materials[code].ByPlayer[realmName][playerName].NbInBag = 
-						(itemCount + self.db.account.materials[code].ByPlayer[realmName][playerName].NbInBag);
+					MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBag = 
+						(itemCount + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBag);
 				end
 			end
 		end
 	end	
 	--call bank and mail update, incase the user is currently moving things between the bag and bank, or retrieving mail
-	self:UpdateNumberInBank();
-	self:UpdateNumberInMailbox();
+	MTracker:UpdateNumberInBank();
+	MTracker:UpdateNumberInMailbox();
 end
 
 function MTracker:UpdateNumberInBank()
-	self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank enter");
+	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
 	if MTracker_BankIsOpen then
-		self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank bank frame is open");
-		self:ResetBankCount();
+		MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank bank frame is open");
+		MTracker:ResetBankCount();
 
 		--as of 2.00.  
 		--container -1 is main bank
@@ -280,19 +338,19 @@ function MTracker:UpdateNumberInBank()
 				--do nothing, just skip these since they are not bank bags.
 			else
 				for slot=1, GetContainerNumSlots(container), 1 do
-					self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank slot,container is "..slot..","..container);
+					MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank slot,container is "..slot..","..container);
 					local itemLink = GetContainerItemLink(container,slot)
-					self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank itemLink is "..isNullOrValue(itemLink));
+					MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank itemLink is "..isNullOrValue(itemLink));
 					if(itemLink) then	-- slot is empty.
---						local itemName = self:NameFromLink(itemLink);
---						local code = self:CodeFromLink(itemLink);	--this is the key to the material
+--						local itemName = MTracker:NameFromLink(itemLink);
+--						local code = MTracker:CodeFromLink(itemLink);	--this is the key to the material
 
-						local code, itemName = self:GetNACFromLink(itemLink);
+						local code, itemName = MTracker:GetNACFromLink(itemLink);
 
-						if (code and self:ItemBeingTracked(code)) then
+						if (code and MTracker:ItemBeingTracked(code)) then
 							local texture, itemCount, locked, quality, readable = GetContainerItemInfo(container,slot);
-							self.db.account.materials[code].ByPlayer[realmName][playerName].NbInBank = 
-								(itemCount + self.db.account.materials[code].ByPlayer[realmName][playerName].NbInBank);
+							MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBank = 
+								(itemCount + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBank);
 						end
 					end
 				end
@@ -315,7 +373,7 @@ end
 --	},
 
 function MTracker:UpdateNumberInGuildBank()
-	self:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInGuildBank enter");
+	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInGuildBank enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 	local guildName = GetGuildInfo("player");
@@ -324,7 +382,7 @@ function MTracker:UpdateNumberInGuildBank()
 		if (MTracker_GuildBankIsOpen and GuildBankFrame.mode == "bank") then
 			local tab = GetCurrentGuildBankTab();
 			local name, icon, isViewable, canDeposit, numWithdrawals, remainingWithdrawals = GetGuildBankTabInfo(tab);
-			self:ResetGBankCount(realmName, guildName,tab);
+			MTracker:ResetGBankCount(realmName, guildName,tab);
 			for i=1, MAX_GUILDBANK_SLOTS_PER_TAB do				--currently 98
 				index = mod(i, NUM_SLOTS_PER_GUILDBANK_GROUP);		--currently 14
 				if ( index == 0 ) then
@@ -332,10 +390,10 @@ function MTracker:UpdateNumberInGuildBank()
 				end
 				local texture, itemCount, locked = GetGuildBankItemInfo(tab, i);
 				local itemLink = GetGuildBankItemLink(tab, i);
-				local code, itemName = self:GetNACFromLink(itemLink);
-				if (code and tab and self:ItemBeingTracked(code)) then
-					self.db.account.materials[code].ByGuild[realmName][guildName][tab].NbInGBank = 
-						(itemCount + self.db.account.materials[code].ByGuild[realmName][guildName][tab].NbInGBank);
+				local code, itemName = MTracker:GetNACFromLink(itemLink);
+				if (code and tab and MTracker:ItemBeingTracked(code)) then
+					MTracker.db.global.materials[code].ByGuild[realmName][guildName][tab].NbInGBank = 
+						(itemCount + MTracker.db.global.materials[code].ByGuild[realmName][guildName][tab].NbInGBank);
 				end
 			end
 		end
@@ -343,64 +401,64 @@ function MTracker:UpdateNumberInGuildBank()
 end
 
 function MTracker:ResetBagCount() 
-	self:LevelDebug(mt_TRACE, "MTracker:ResetBagCount enter");
+	MDebug:LevelDebug(mt_TRACE, "MTracker:ResetBagCount enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
-	for k,v in pairs(self.db.account.materials) do
-		self:LevelDebug(mt_TRACE, "key is "..k);
-		self.db.account.materials[k].ByPlayer[realmName][playerName].NbInBag=0;
+	for k,v in pairs(MTracker.db.global.materials) do
+		MDebug:LevelDebug(mt_TRACE, "key is "..k);
+		MTracker.db.global.materials[k].ByPlayer[realmName][playerName].NbInBag=0;
 	end
 end
 
 function MTracker:ResetBankCount() 
-	self:LevelDebug(mt_TRACE, "MTracker:ResetBankCount enter");
+	MDebug:LevelDebug(mt_TRACE, "MTracker:ResetBankCount enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
-	for k,v in pairs(self.db.account.materials) do
-		self:LevelDebug(mt_TRACE, "key is "..k);
-		self.db.account.materials[k].ByPlayer[realmName][playerName].NbInBank=0;
+	for k,v in pairs(MTracker.db.global.materials) do
+		MDebug:LevelDebug(mt_TRACE, "key is "..k);
+		MTracker.db.global.materials[k].ByPlayer[realmName][playerName].NbInBank=0;
 	end
 end
 function MTracker:ResetMailboxCount() 
-	self:LevelDebug(mt_TRACE, "MTracker:ResetMailboxCount enter");
+	MDebug:LevelDebug(mt_TRACE, "MTracker:ResetMailboxCount enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
-	for k,v in pairs(self.db.account.materials) do
-		self:LevelDebug(mt_TRACE, "key is "..k);
-		self.db.account.materials[k].ByPlayer[realmName][playerName].NbInMail=0;
+	for k,v in pairs(MTracker.db.global.materials) do
+		MDebug:LevelDebug(mt_TRACE, "key is "..k);
+		MTracker.db.global.materials[k].ByPlayer[realmName][playerName].NbInMail=0;
 	end
 end
 function MTracker:ResetGBankCount(realmName, guildName,tab)
-	self:LevelDebug(mt_TRACE, "MTracker:ResetGBankCount enter");
+	MDebug:LevelDebug(mt_TRACE, "MTracker:ResetGBankCount enter");
 --	local playerName = MTracker_CurrentPlayer[1];
 --	local realmName = MTracker_CurrentPlayer[2];
 --	local guildName = GetGuildInfo("player");
 
 	--create db table if nil
---	self.db.account.materials[code].ByGuild={};
---	self.db.account.materials[code].ByGuild[realmName]={};
+--	MTracker.db.global.materials[code].ByGuild={};
+--	MTracker.db.global.materials[code].ByGuild[realmName]={};
 
 
-	for k,v in pairs(self.db.account.materials) do
-		self:LevelDebug(mt_TRACE, "key is "..k);
-		if (not self.db.account.materials[k].ByGuild[realmName][guildName]) then
-			self.db.account.materials[k].ByGuild[realmName][guildName]={};
+	for k,v in pairs(MTracker.db.global.materials) do
+		MDebug:LevelDebug(mt_TRACE, "key is "..k);
+		if (not MTracker.db.global.materials[k].ByGuild[realmName][guildName]) then
+			MTracker.db.global.materials[k].ByGuild[realmName][guildName]={};
 		end
-		if (not self.db.account.materials[k].ByGuild[realmName][guildName][tab]) then
-			self.db.account.materials[k].ByGuild[realmName][guildName][tab]={};
+		if (not MTracker.db.global.materials[k].ByGuild[realmName][guildName][tab]) then
+			MTracker.db.global.materials[k].ByGuild[realmName][guildName][tab]={};
 		end
-		self.db.account.materials[k].ByGuild[realmName][guildName][tab].NbInGBank=0;
+		MTracker.db.global.materials[k].ByGuild[realmName][guildName][tab].NbInGBank=0;
 	end
 end
 function MTracker:getLinkFromName(name)
 	if (name==nil) then return end;
 
-	for key,value in pairs(self.db.account.materials) do 
-		if (self.db.account.materials[key].Name == name) then
-			return self.db.account.materials[key].Link;
+	for key,value in pairs(MTracker.db.global.materials) do 
+		if (MTracker.db.global.materials[key].Name == name) then
+			return MTracker.db.global.materials[key].Link;
 		end
 	end
 	return nil;
@@ -408,8 +466,8 @@ end
 function MTracker:getCodeFromName(name)
 	if (name==nil) then return end;
 
-	for key,value in pairs(self.db.account.materials) do 
-		if (self.db.account.materials[key].Name == name) then
+	for key,value in pairs(MTracker.db.global.materials) do 
+		if (MTracker.db.global.materials[key].Name == name) then
 			return key;
 		end
 	end
@@ -417,64 +475,63 @@ function MTracker:getCodeFromName(name)
 end
 
 function MTracker:AddProfessionNameToMaterial(itemCode, professionName) 
-	self:LevelDebug(mt_TRACE, "MTracker:AddProfessionNameToMaterial enter");
-	self:LevelDebug(mt_TRACE, "adding "..isNullOrValue(professionName).." to "..isNullOrValue(itemCode));
+	MDebug:LevelDebug(mt_TRACE, "MTracker:AddProfessionNameToMaterial enter");
+	MDebug:LevelDebug(mt_TRACE, "adding "..isNullOrValue(professionName).." to "..isNullOrValue(itemCode));
 
-	if (not self.db.account.materials[itemCode].UsedIn) then
-		self.db.account.materials[itemCode].UsedIn={};
+	if (not MTracker.db.global.materials[itemCode].UsedIn) then
+		MTracker.db.global.materials[itemCode].UsedIn={};
 	end
-	self.db.account.materials[itemCode].UsedIn[professionName]=true;
+	MTracker.db.global.materials[itemCode].UsedIn[professionName]=true;
 end
 
 
 function MTracker:UpdateTradeSkillSavedMaterials(tradeSkillName)
-	self:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillSavedMaterials enter");
+	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillSavedMaterials enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
 	for i=1, GetNumTradeSkills(), 1 do
 		--skillType is either "header", if the skillIndex references to a heading, or a string indicating the difficulty to craft the item ("trivial", "easy" (?), "optimal", "difficult").
 		local skillName, skillType, numAvailable, isExpanded = GetTradeSkillInfo(i)
-		self:LevelDebug(mt_TRACE, "skillName is "..isNullOrValue(skillName));
+		MDebug:LevelDebug(mt_TRACE, "skillName is "..isNullOrValue(skillName));
 		
 		if (skillType ~="header") then
 			for j=1, GetTradeSkillNumReagents(i), 1 do
 				local reagentName, reagentTexture, reagentCount, playerReagentCount = GetTradeSkillReagentInfo(i, j);
-				self:LevelDebug(mt_TRACE, "reagentName is "..isNullOrValue(reagentName));
+				MDebug:LevelDebug(mt_TRACE, "reagentName is "..isNullOrValue(reagentName));
 				local reagentlink = GetTradeSkillReagentItemLink(i,j);
-				local code = self:CodeFromLink(reagentlink);
-				self:LevelDebug(mt_TRACE, "code is "..isNullOrValue(code));
+				local code = MTracker:CodeFromLink(reagentlink);
+				MDebug:LevelDebug(mt_TRACE, "code is "..isNullOrValue(code));
 
 				if (code) then
-					if (not self.db.account.materials[code]) then
-						self.db.account.materials[code]={};
-						self.db.account.materials[code].ByPlayer={};
-						self.db.account.materials[code].ByPlayer[realmName]={};
-						self.db.account.materials[code].ByPlayer[realmName][playerName]={};
-						self.db.account.materials[code].ByGuild={};
-						self.db.account.materials[code].ByGuild[realmName]={};
+					if (not MTracker.db.global.materials[code]) then
+						MTracker.db.global.materials[code]={};
+						MTracker.db.global.materials[code].ByPlayer={};
+						MTracker.db.global.materials[code].ByPlayer[realmName]={};
+						MTracker.db.global.materials[code].ByPlayer[realmName][playerName]={};
+						MTracker.db.global.materials[code].ByGuild={};
+						MTracker.db.global.materials[code].ByGuild[realmName]={};
 					end
-					self.db.account.materials[code].Texture = reagentTexture;
-					self.db.account.materials[code].Link = reagentlink;
-					self.db.account.materials[code].Name = reagentName;
-					self.db.account.materials[code].tracked = true;
-					self:AddProfessionNameToMaterial(code, tradeSkillName);
+					MTracker.db.global.materials[code].Texture = reagentTexture;
+					MTracker.db.global.materials[code].Link = reagentlink;
+					MTracker.db.global.materials[code].Name = reagentName;
+					MTracker.db.global.materials[code].tracked = true;
+					MTracker:AddProfessionNameToMaterial(code, tradeSkillName);
 				end
 			end
 		end		
 	end
---	self.db.account.config.DBVersion = MATERIALSTRACKER_DB_VERSION;
 end
 
 function MTracker:ItemBeingTracked(code) 
-	if (not self.db.account.materials[code]) then 
+	if (not MTracker.db.global.materials[code]) then 
 		return false; 
 	end
-	return self.db.account.materials[code].tracked;
+	return MTracker.db.global.materials[code].tracked;
 end
 
 function MTracker:getUsedIn(code) 
-	return self.db.account.materials[code].UsedIn;
+	return MTracker.db.global.materials[code].UsedIn;
 end
 
 function MTracker_HookTooltip(tipFrame, item, count, name, link, quality)
@@ -542,7 +599,7 @@ function MTracker_HookTooltip_old(funcVars, retVal, frame, name, link, quality, 
 end
 
 function MTracker:BuildUsedInString(UsedIntable) 
-	self:LevelDebug(mt_TRACE, "MTracker:BuildUsedInString enter");
+	MDebug:LevelDebug(mt_TRACE, "MTracker:BuildUsedInString enter");
 	local usedInString="";
 	if (UsedIntable) then
 		for profession, value in pairs(UsedIntable) do
@@ -562,10 +619,10 @@ function MTracker:getMaterialCounts(code, player, guildName, realmName)
 	if (not guildName) then guildName = GetGuildInfo("player"); end
 	if (not realmName) then realmName = MTracker_CurrentPlayer[2]; end
 
-	local tableNbArg = self.db.account.materials[code].ByPlayer[realmName];
-	local tableGNbArg = self.db.account.materials[code].ByGuild[realmName][guildName];
+	local tableNbArg = MTracker.db.global.materials[code].ByPlayer[realmName];
+	local tableGNbArg = MTracker.db.global.materials[code].ByGuild[realmName][guildName];
 
-	local nbInBag, nbInBank, nbInReroll, nbInMail, nbInGBank = self:getMaterialCountsWithTable(tableNbArg, tableGNbArg, MTracker_CurrentPlayer[1]);
+	local nbInBag, nbInBank, nbInReroll, nbInMail, nbInGBank = MTracker:getMaterialCountsWithTable(tableNbArg, tableGNbArg, MTracker_CurrentPlayer[1]);
 	return nbInBag, nbInBank, nbInReroll, nbInMail, nbInGBank;
 end
 
@@ -602,80 +659,80 @@ function MTracker:UseTooltips_Update()
 	if (MTracker_UseTooltips) then
 		tooltip:RemoveCallback(MTracker_HookTooltip);
 		MTracker_UseTooltips=false;
-		self:Print("MaterialsTracker: Tooltips disabled");
+		MTracker:Print("MaterialsTracker: Tooltips disabled");
 	else
 		tooltip:AddCallback( { type = "item", callback = MTracker_HookTooltip }, 500)
 		MTracker_UseTooltips=true;
-		self:Print("MaterialsTracker: Tooltips enabled");
+		MTracker:Print("MaterialsTracker: Tooltips enabled");
 	end
 end
 
 
-function MTracker:ShowCountsInChat(itemlink)
-	self:LevelDebug(mt_TRACE, "ShowCountsInChat enter");
+function MTracker:ShowCountsInChat(info, itemlink)
+	MDebug:LevelDebug(mt_TRACE, "ShowCountsInChat enter");
 
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
 	if (itemlink) then
-		local code = self:CodeFromLink(itemlink);
+		local code = MTracker:CodeFromLink(itemlink);
 		if (code==nil) then return; end
 
-		if (not self.db.account.materials[code].Name) then
-			self:Print(itemlink.." is not being tracked");
+		if (not MTracker.db.global.materials[code].Name) then
+			MTracker:Print(itemlink.." is not being tracked");
 			return;
 		end
 
-		self:Print(itemlink.." on the following players");
-		local players = self.db.account.players[realmName];
+		MTracker:Print(itemlink.." on the following players");
+		local players = MTracker.db.global.players[realmName];
 		for playerName,v in pairs(players) do
-			local nbInBag = self.db.account.materials[code].ByPlayer[realmName][playerName].NbInBag or 0;
-			local nbInBank = self.db.account.materials[code].ByPlayer[realmName][playerName].NbInBank or 0;
-			local nbInMail = self.db.account.materials[code].ByPlayer[realmName][playerName].NbInMail or 0;
-			self:Print(" "..playerName..": Bags="..nbInBag..", Bank="..nbInBank..", Mail="..nbInMail);
+			local nbInBag = MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBag or 0;
+			local nbInBank = MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBank or 0;
+			local nbInMail = MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInMail or 0;
+			MTracker:Print(" "..playerName..": Bags="..nbInBag..", Bank="..nbInBank..", Mail="..nbInMail);
 		end
-		self:Print("");
-		self:Print(itemlink.." in the following guilds");
-		local tableGNbArg = self.db.account.materials[code].ByGuild[realmName];
+		MTracker:Print("");
+		MTracker:Print(itemlink.." in the following guilds");
+		local tableGNbArg = MTracker.db.global.materials[code].ByGuild[realmName];
 		for guildName, guildTable in pairs (tableGNbArg) do
 			local nbInGBank=0;
 			for tabName, tagTable in pairs (guildTable) do
 				nbInGBank=nbInGBank+tagTable["NbInGBank"];
 			end
-			self:Print( guildName..": "..nbInGBank);
+			MTracker:Print( guildName..": "..nbInGBank);
 		end
 	end
 end
 
-function MTracker:AddItem(itemlink)
-	self:LevelDebug(mt_TRACE, "AddItem enter");
+function MTracker:AddItem(info, itemlink)
+	MDebug:LevelDebug(mt_TRACE, "AddItem enter");
 
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
 	if (itemlink) then
-		local code = self:CodeFromLink(itemlink);
+		MTracker:Print("itemlink "..itemlink);
+		local code = MTracker:CodeFromLink(itemlink);
 		if (not code) then return; end
 
 --		local itemName, itemLink, itemRarity, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture = GetItemInfo("item:"..code);
 		local itemName, itemLink, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, invTexture = GetItemInfo(itemlink);
 		if (not itemName) then return nil; end
 
-		if (not self.db.account.materials[code]) then
-			self.db.account.materials[code]={};
-			self.db.account.materials[code].ByPlayer={};
-			self.db.account.materials[code].ByPlayer[realmName]={};
-			self.db.account.materials[code].ByPlayer[realmName][playerName]={};
-			self.db.account.materials[code].ByGuild={};
-			self.db.account.materials[code].ByGuild[realmName]={};
+		if (not MTracker.db.global.materials[code]) then
+			MTracker.db.global.materials[code]={};
+			MTracker.db.global.materials[code].ByPlayer={};
+			MTracker.db.global.materials[code].ByPlayer[realmName]={};
+			MTracker.db.global.materials[code].ByPlayer[realmName][playerName]={};
+			MTracker.db.global.materials[code].ByGuild={};
+			MTracker.db.global.materials[code].ByGuild[realmName]={};
 		end
-		self.db.account.materials[code].Texture = itemTexture;
-		self.db.account.materials[code].Link = itemLink;
-		self.db.account.materials[code].Name = itemName;
-		self.db.account.materials[code].tracked = true;
+		MTracker.db.global.materials[code].Texture = itemTexture;
+		MTracker.db.global.materials[code].Link = itemLink;
+		MTracker.db.global.materials[code].Name = itemName;
+		MTracker.db.global.materials[code].tracked = true;
 
-		self:Print("Item "..itemlink.." added");
-
+		MTracker:Print("Item "..itemlink.." added");
 	end
 
 end
@@ -684,15 +741,15 @@ end
 -- this function will compare the current DB version, and the users DB version and see if it needs to be updated.
 -- this will only be used when key data has changed, like the occurence in wow patch 2.0.1, when itemlinks were changed.
 function MTracker:CheckDatabaseVersion()
-	self:Print("CheckDatabaseVersion");
+--	MTracker:Print("CheckDatabaseVersion");
 	local needsCleaning=false;
 
-	if (self.db.account.config.DBVersion) then
-		local existing = tonumber(self.db.account.config.DBVersion);
+	if (MTracker.dbconfig.global.config.DBVersion) then
+		local existing = tonumber(MTracker.dbconfig.global.config.DBVersion);
 		local new = MATERIALSTRACKER_DB_VERSION;
 
---		self:Print("existing is "..existing);
---		self:Print("new is "..new);
+--		MTracker:Print("existing is "..existing);
+--		MTracker:Print("new is "..new);
 
 		if (existing < new) then 
 			needsCleaning=true;
@@ -703,12 +760,15 @@ function MTracker:CheckDatabaseVersion()
 
 	if (needsCleaning) then
 --		MessageFrame:AddMessage("MaterialsTracker has detected that your database is outdated.  It will be reset now.", 0.8, 0.2, 0.2, 1.0, 5);
-		self:Print("MaterialsTracker has detected that your database is outdated.  It will be reset now.");
-		self.db.account.materials={};
-		self.db.account.players={};
+		MTracker:Print("MaterialsTracker has detected that your database is outdated.  It will be reset now.");
+		MTracker.db:ResetDB("Default");
+--		MTracker.db.global.materials={};
+--		MTracker.db.global.players={};
 	end
 
-	self.db.account.config.DBVersion=MATERIALSTRACKER_DB_VERSION;
+--	MTracker:Print("database version is "..MTracker.dbconfig.global.config.DBVersion);
+	MTracker.dbconfig.global.config.DBVersion=MATERIALSTRACKER_DB_VERSION;
+--	MTracker:Print("database version is "..MTracker.dbconfig.global.config.DBVersion);
 	
 end
 
@@ -732,7 +792,7 @@ function MTracker:CodeFromLink(link)
 	if (not link) then return nil; end
 	if (type(link) ~= 'string') then return end
 	
-	local itemID = self:breakLink(link);
+	local itemID = MTracker:breakLink(link);
 	return itemID;
 end
 
@@ -740,7 +800,7 @@ function MTracker:GetNACFromLink(link)
 	if (not link) then return end;
 	if (type(link) ~= 'string') then return end;
 
-	local itemID, _, _, _, name = self:breakLink(link);
+	local itemID, _, _, _, name = MTracker:breakLink(link);
 
 	return itemID, name;
 end

@@ -1116,7 +1116,7 @@ do -- ExtraTip "class" definition
 
 	local line_mt = {
 		__index = function(t,k)
-			local v = getglobal(t.name..k)
+			local v = _G[t.name..k]
 			rawset(t,k,v)
 			return v
 		end

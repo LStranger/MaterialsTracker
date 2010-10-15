@@ -83,6 +83,9 @@ local LIBSTRING = MAJOR..":"..MINOR
 local lib = LibStub:NewLibrary(LIBSTRING,REVISION)
 if not lib then return end
 
+local type = type
+local gsub = gsub
+
 do -- tooltip class definition
 	local libTT = LibStub("LibExtraTip-1")
 	local MoneyViewClass = LibStub("LibMoneyFrame-1")
@@ -161,20 +164,25 @@ do -- tooltip class definition
 
 	local lastSaneLink, lastSanitized
 	function lib:SanitizeLink(link)
-		local _
 		if not link then
 			return
 		end
+		if lastSanitized == link or lastSaneLink == link then
+			return lastSaneLink
+		end
 		if type(link) == "number" then
-			_, link = GetItemInfo(link)
+			local _, tlink = GetItemInfo(link)
+			link = tlink
 		end
 		if type(link) ~= "string" then
 			return
 		end
-		if lastSanitized and (lastSanitized == link or lastSaneLink == link) then
-			return lastSaneLink
+		local newlink, test = gsub(link, "(|Hitem:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+):%d+([|:][^h]*h)", "%1:80%2")
+		if test ~= 1 then
+			print("TipHelper Sanitize Link: Unable to sanitize "..link)
+			--return
 		end
-		lastSaneLink = string.gsub(link, "(|Hitem:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+):%d+(|h)", "%1:80%2")
+		lastSaneLink = newlink
 		lastSanitized = link
 		return lastSaneLink
 	end
@@ -301,7 +309,7 @@ do -- tooltip class definition
 	]]
 	function lib:AddLine(...)
 		assert(inLayout, "Error, no tooltip to add line to in nTipHelper:AddLine()")
-	
+
 		local left, right, amount, red,green,blue, embed
 		local numArgs = select("#", ...)
 		local left = ...
@@ -379,3 +387,7 @@ do -- tooltip class definition
 
 end -- tooltip class definition
 
+function _debug(link)
+	print(gsub(link, "|", "||"))
+	print(gsub(AucAdvanced.SanitizeLink(link), "|", "||"))
+end

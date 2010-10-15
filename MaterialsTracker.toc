@@ -1,26 +1,18 @@
-## Interface: 30300
+## Interface: 40000
 ## Title: MaterialsTracker 
 ## Notes: Provides information of tradeskill and crafting materials that are in the banks and bags of your characters.
 ## Author: Shamino
-## Version: 30300.01
+## Version: 40000.01
 ## X-Category: Inventory
 ## X-Website: http://www.curse-gaming.com/en/files/details/3200/materialstracker/
 ## X-RelSite-WoWI: 6237
 ## X-RelSite-Curse: 3200
-## SavedVariables: MaterialsTracker_Materials
-## SavedVariablesPerCharacter: MaterialsTracker_PlayerConfig
-## OptionalDeps: Ace2
+## SavedVariables: MTrackerDB, MTrackerConfigDB
+## SavedVariablesPerCharacter: MTrackerPerCharDB
 ## X-Embeds: Ace2
 
-libs\AceLibrary\AceLibrary.lua
-libs\AceOO-2.0\AceOO-2.0.lua
-libs\AceAddon-2.0\AceAddon-2.0.lua
-libs\AceDB-2.0\AceDB-2.0.lua
-libs\AceConsole-2.0\AceConsole-2.0.lua
-libs\AceEvent-2.0\AceEvent-2.0.lua
-libs\AceDebug-2.0\AceDebug-2.0.lua
+embeds.xml
 
-libs\LibStub\LibStub.lua
 libs\LibExtraTip\LibExtraTip.lua
 libs\LibExtraTip\LibMoneyFrame.lua
 libs\TipHelper\nTipHelper.lua

@@ -11,13 +11,17 @@ local MTracker_NUMBER_OF_BAG_SLOTS = 4;
 local MTracker_UseTooltips=true;
 local MTracker_LastMailScan=0;
 local MTracker_MailScanInterval=60;	--time in seconds between mail scans.  appears the UI only retrieves mail from the server every 60 seconds.
+local MTracker_LastTradeSkillOpenTime=0;
+local MTracker_TradeSkillPauseTime=2;
+local MTracker_TradeSkillIsOpen = false;
+local MTracker_TradeSkillNeedScan = false;
 
 --debug levels
 local mt_TRACE=2;
 local mt_INFO=1;
 local tooltip = LibStub("nTipHelper:1")
 
-MTracker = LibStub("AceAddon-3.0"):NewAddon("MTracker", "AceConsole-3.0", "AceEvent-3.0")
+MTracker = LibStub("AceAddon-3.0"):NewAddon("MTracker", "AceConsole-3.0", "AceEvent-3.0", "AceHook-3.0")
 MEvent = AceLibrary("AceAddon-2.0"):new("AceEvent-2.0");
 MDebug = AceLibrary("AceAddon-2.0"):new("AceDebug-2.0");
 local AceConfig = LibStub("AceConfig-3.0");
@@ -65,7 +69,6 @@ local configDefault = {
 	}
 }
 
---self:RegisterChatCommand({"/mtracker"},
 MTrackerOptionsTable = {
 	type = "group",
 	args = {
@@ -107,57 +110,11 @@ MTrackerOptionsTable = {
 		},
 	}
 }
---	"MATERIALSTRACKER"
---);
 
 function MTracker:OnInitialize()
 	--Setup our chat command interface
 	AceConfig:RegisterOptionsTable("MTracker", MTrackerOptionsTable, {"mtracker"})
 
---	self:RegisterChatCommand({"/mtracker"},
---		{
---			type = "group",
---			args = {
---				resetdata = {
---					type = "execute",
---					name = "reset to the default config",
---					desc = "reset",
---			    	      	func = function() MTracker.db:ResetDB(); end,
---				},
---				tooltips = {
---					type = "execute",
---					name = "update the usage of tooltips",
---					desc = "reset",
---			    	      	func = function() MTracker:UseTooltips_Update(); end,
---				},
---				item = {
---					type = "text",
---					name = "item",
---					desc = "list item counts",
---					usage = "<itemlink>",
---					get = false,
---			    	      	set = function(v) MTracker:ShowCountsInChat(v); end,
---				},
---				additem = {
---					type = "text",
---					name = "additem",
---					desc = "add an item to the database",
---					usage = "<itemlink>",
---					get = false,
---			    	      	set = function(v) MTracker:AddItem(v); end,
---				},
---				debugLevel = {
---					type = "text",
---					name = "debugLevel",
---					desc = "change debug level.  1=INFO, 2=TRACE",
---					usage = "<level>",
---					get = false,
---			    	      	set = function(v) MTracker:SetDebugLevel(tonumber(v)); end,
---				},
---			}
---		},
---		"MATERIALSTRACKER"
---	);
 	local acedb = LibStub:GetLibrary("AceDB-3.0")
 	MTracker.db = acedb:New("MTrackerDB", materialsDefault, true);
 	MTracker.dbconfig = acedb:New("MTrackerConfigDB", configDefault, true);
@@ -176,7 +133,6 @@ function MTracker:OnEnable()
 
 	-- events
 	MTracker:RegisterOurEvents();
-	------------------
 
 	MTracker:AddUserToPlayerTable();
 end
@@ -196,7 +152,8 @@ end
 
 function MTracker:RegisterOurEvents()
 	MTracker:RegisterEvent("BAG_UPDATE", "UpdateNumberInBag");
-	MTracker:RegisterEvent("TRADE_SKILL_SHOW", "UpdateTradeSkillsSavedMaterials");
+	MTracker:RegisterEvent("TRADE_SKILL_SHOW");
+	MTracker:RegisterEvent("TRADE_SKILL_CLOSE");
 	MTracker:RegisterEvent("BANKFRAME_OPENED", "BankIsOpened");
 	MTracker:RegisterEvent("BANKFRAME_CLOSED", "BankIsClosed");
 	MTracker:RegisterEvent("MAIL_SHOW", "MailboxIsOpened");
@@ -235,6 +192,30 @@ function MTracker:GuildBankIsClosed()
 	MTracker_GuildBankIsOpen = false;
 end
 
+function MTracker:TRADE_SKILL_SHOW()
+	if (not MTracker:IsHooked(TradeSkillFrame, "OnUpdate")) then
+		MTracker:HookScript(TradeSkillFrame, "OnUpdate", "TradeSkillFrameOnUpdate")
+	end
+	MTracker_TradeSkillIsOpen=true;
+	MTracker_TradeSkillNeedScan=true;
+	MTracker_LastTradeSkillOpenTime=GetTime();
+end
+
+function MTracker:TRADE_SKILL_CLOSE()
+	MTracker:Unhook(TradeSkillFrame, "OnUpdate")
+	MTracker_TradeSkillIsOpen=false;
+	MTracker_TradeSkillNeedScan=false;
+	MTracker_LastTradeSkillOpenTime=0;
+end
+
+function MTracker:TradeSkillFrameOnUpdate(...)
+	if (not UnitAffectingCombat("player")) then
+		if ((GetTime()-MTracker_LastTradeSkillOpenTime) > MTracker_TradeSkillPauseTime and MTracker_TradeSkillNeedScan) then
+			MTracker:UpdateTradeSkillsSavedMaterials();
+		end
+	end
+end
+
 function MTracker:UpdateTradeSkillsSavedMaterials()
 	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillsSavedMaterials enter");
 
@@ -243,6 +224,7 @@ function MTracker:UpdateTradeSkillsSavedMaterials()
 
 	--TODO: create table in localization file and check that tradeSkill is in there.
 	if (tradeSkill~=nil) then
+		MTracker_TradeSkillNeedScan=false;
 		MTracker:UpdateTradeSkillSavedMaterials(tradeSkill);
 	end
 end
@@ -289,31 +271,33 @@ function MTracker:UpdateNumberInBag()
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
-	--reset bag count for this player
-	MTracker:ResetBagCount();
+	if (not UnitAffectingCombat("player")) then
+		--reset bag count for this player
+		MTracker:ResetBagCount();
 
-	for bag=0, MTracker_NUMBER_OF_BAG_SLOTS, 1 do
-		for slot=1, GetContainerNumSlots(bag), 1 do
-			local itemLink = GetContainerItemLink(bag,slot);
-			if(itemLink) then	--bag slot is empty.
---				local itemName = MTracker:NameFromLink(itemLink);
---				local code = MTracker:CodeFromLink(itemLink);	--the code is the key to the material
+		for bag=0, MTracker_NUMBER_OF_BAG_SLOTS, 1 do
+			for slot=1, GetContainerNumSlots(bag), 1 do
+				local itemLink = GetContainerItemLink(bag,slot);
+				if(itemLink) then	--bag slot is empty.
+	--				local itemName = MTracker:NameFromLink(itemLink);
+	--				local code = MTracker:CodeFromLink(itemLink);	--the code is the key to the material
 
-				local code, itemName = MTracker:GetNACFromLink(itemLink);
-				MDebug:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag itemName is "..isNullOrValue(itemName));
-				MDebug:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag code is "..isNullOrValue(code));
+					local code, itemName = MTracker:GetNACFromLink(itemLink);
+					MDebug:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag itemName is "..isNullOrValue(itemName));
+					MDebug:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag code is "..isNullOrValue(code));
 
-				if (code and MTracker:ItemBeingTracked(code)) then
-					local texture, itemCount, locked, quality, readable = GetContainerItemInfo(bag,slot);
-					MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBag = 
-						(itemCount + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBag);
+					if (code and MTracker:ItemBeingTracked(code)) then
+						local texture, itemCount, locked, quality, readable = GetContainerItemInfo(bag,slot);
+						MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBag = 
+							(itemCount + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBag);
+					end
 				end
 			end
-		end
-	end	
-	--call bank and mail update, incase the user is currently moving things between the bag and bank, or retrieving mail
-	MTracker:UpdateNumberInBank();
-	MTracker:UpdateNumberInMailbox();
+		end	
+		--call bank and mail update, incase the user is currently moving things between the bag and bank, or retrieving mail
+		MTracker:UpdateNumberInBank();
+		MTracker:UpdateNumberInMailbox();
+	end
 end
 
 function MTracker:UpdateNumberInBank()
@@ -487,6 +471,7 @@ end
 
 function MTracker:UpdateTradeSkillSavedMaterials(tradeSkillName)
 	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillSavedMaterials enter");
+
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
@@ -775,18 +760,6 @@ end
 
 
 --------------------common Util functions--------------------
-
---returns the name from the item link
---function MTracker:NameFromLink(link)
---	local name;
---	if( not link ) then
---		return nil;
---	end
---
---	--"|cffffffff|Hitem:3819:0:0:0|h[Wintersbite]|h|r"		--from 1.12
---	--"|cffffffff|Hitem:3819:0:0:0:0:0:0:0|h[Wintersbite]|h|r"	--from 2.00
---	return string.match(link, "|c%x+|Hitem:%d+:%d+:%d+:%d+:%d+:%d:%d:%d+|h%[(.-)%]|h|r");
---end
 
 function MTracker:CodeFromLink(link)
 	if (not link) then return nil; end

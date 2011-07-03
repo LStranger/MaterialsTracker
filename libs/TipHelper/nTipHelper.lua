@@ -1,7 +1,7 @@
 --[[
 	Norganna's Tooltip Helper class
 	Version: 1.0
-	Revision: $Id$
+	Revision: $Id: nTipHelper.lua 285 2010-11-02 09:38:55Z brykrys $
 	URL: http://norganna.org/tthelp
 
 	This is a slide-in helper class for the Norganna's AddOns family of AddOns
@@ -178,10 +178,6 @@ do -- tooltip class definition
 			return
 		end
 		local newlink, test = gsub(link, "(|Hitem:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+):%d+([|:][^h]*h)", "%1:80%2")
-		if test ~= 1 then
-			print("TipHelper Sanitize Link: Unable to sanitize "..link)
-			--return
-		end
 		lastSaneLink = newlink
 		lastSanitized = link
 		return lastSaneLink
@@ -386,8 +382,3 @@ do -- tooltip class definition
 	end
 
 end -- tooltip class definition
-
-function _debug(link)
-	print(gsub(link, "|", "||"))
-	print(gsub(AucAdvanced.SanitizeLink(link), "|", "||"))
-end

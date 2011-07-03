@@ -1,5 +1,5 @@
-## Interface: 40000
-## Title: MaterialsTracker 
+## Interface: 40200
+## Title: MaterialsTracker |cffff00ff -Ace3-|r
 ## Notes: Provides information of tradeskill and crafting materials that are in the banks and bags of your characters.
 ## Author: Shamino
 ## Version: 40000.01
@@ -9,7 +9,7 @@
 ## X-RelSite-Curse: 3200
 ## SavedVariables: MTrackerDB, MTrackerConfigDB
 ## SavedVariablesPerCharacter: MTrackerPerCharDB
-## X-Embeds: Ace2
+## X-Embeds: Ace3, Ace2
 
 embeds.xml
 

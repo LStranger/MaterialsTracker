@@ -1,5 +1,5 @@
-MATERIALSTRACKER_VERSION = "40000.01";
-MATERIALSTRACKER_DB_VERSION = 40001;
+MATERIALSTRACKER_VERSION = "40200.01";
+MATERIALSTRACKER_DB_VERSION = 40200;
 
 --runtime variables
 local MTracker_BankIsOpen = false;
@@ -16,19 +16,20 @@ local MTracker_TradeSkillPauseTime=2;
 local MTracker_TradeSkillIsOpen = false;
 local MTracker_TradeSkillNeedScan = false;
 
---debug levels
-local mt_TRACE=2;
-local mt_INFO=1;
 local tooltip = LibStub("nTipHelper:1")
 
 MTracker = LibStub("AceAddon-3.0"):NewAddon("MTracker", "AceConsole-3.0", "AceEvent-3.0", "AceHook-3.0")
-MEvent = AceLibrary("AceAddon-2.0"):new("AceEvent-2.0");
-MDebug = AceLibrary("AceAddon-2.0"):new("AceDebug-2.0");
 local AceConfig = LibStub("AceConfig-3.0");
 
 
 local MTracker = _G.MTracker
-local MDebug = _G.MDebug
+
+local debugf = tekDebug and tekDebug:GetFrame("MTracker");
+local function Debug(...) 
+	if debugf then 
+		debugf:AddMessage(string.join(", ", ...)) 
+	end 
+end
 
 local materialsDefault = {
 	global = {
@@ -100,14 +101,14 @@ MTrackerOptionsTable = {
 			get = false,
 			set = function(info,v) MTracker:AddItem(info,v); end,
 		},
-		debugLevel = {
-			type = "input",
-			name = "debugLevel",
-			desc = "change debug level.  1=INFO, 2=TRACE",
-			usage = "<level>",
-			get = false,
-			set = function(info,v) MDebug:SetDebugLevel(tonumber(v)); end,
-		},
+--		debugLevel = {
+--			type = "input",
+--			name = "debugLevel",
+--			desc = "change debug level.  1=INFO, 2=TRACE",
+--			usage = "<level>",
+--			get = false,
+--			set = function(info,v) MDebug:SetDebugLevel(tonumber(v)); end,
+--		},
 	}
 }
 
@@ -125,8 +126,6 @@ function MTracker:OnInitialize()
 end
 
 function MTracker:OnEnable()
-	MDebug:SetDebugging(false);
-
 	-- Hook in new tooltip code
 	tooltip:Activate();
 	tooltip:AddCallback( { type = "item", callback = MTracker_HookTooltip }, 500)
@@ -217,10 +216,11 @@ function MTracker:TradeSkillFrameOnUpdate(...)
 end
 
 function MTracker:UpdateTradeSkillsSavedMaterials()
-	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillsSavedMaterials enter");
+	Debug("UpdateTradeSkillsSavedMaterials enter");
 
 	local tradeSkill = GetTradeSkillLine();
-	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillsSavedMaterials tradeSkill opened is "..isNullOrValue(tradeSkill));
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillsSavedMaterials tradeSkill opened is "..isNullOrValue(tradeSkill));
+	Debug("UpdateTradeSkillsSavedMaterials: tradeSkill opened is "..isNullOrValue(tradeSkill));
 
 	--TODO: create table in localization file and check that tradeSkill is in there.
 	if (tradeSkill~=nil) then
@@ -230,7 +230,7 @@ function MTracker:UpdateTradeSkillsSavedMaterials()
 end
 
 function MTracker:UpdateNumberInMailbox()
-	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox enter");
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox enter");
 
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
@@ -248,13 +248,13 @@ function MTracker:UpdateNumberInMailbox()
 		for mailItem=1, nbr, 1 do
 			for attachment=1, ATTACHMENTS_MAX_RECEIVE, 1 do
 				local name, itemTexture, count, quality, canUse = GetInboxItem(mailItem, attachment);
-				MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox itemName is "..isNullOrValue(name));
+				--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox itemName is "..isNullOrValue(name));
 
 				if (name~= nil) then
 					local code = MTracker:getCodeFromName(name);
 --					if (code and MTracker.db.global.materials[code].tracked) then
 					if (code and MTracker:ItemBeingTracked(code)) then
-						MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox code is "..isNullOrValue(code));
+						--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox code is "..isNullOrValue(code));
 						MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInMail = 
 							(count + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInMail);
 					end
@@ -267,7 +267,7 @@ function MTracker:UpdateNumberInMailbox()
 end
 
 function MTracker:UpdateNumberInBag()
-	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBag enter");
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBag enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
@@ -283,8 +283,8 @@ function MTracker:UpdateNumberInBag()
 	--				local code = MTracker:CodeFromLink(itemLink);	--the code is the key to the material
 
 					local code, itemName = MTracker:GetNACFromLink(itemLink);
-					MDebug:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag itemName is "..isNullOrValue(itemName));
-					MDebug:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag code is "..isNullOrValue(code));
+					--MDebug:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag itemName is "..isNullOrValue(itemName));
+					--MDebug:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag code is "..isNullOrValue(code));
 
 					if (code and MTracker:ItemBeingTracked(code)) then
 						local texture, itemCount, locked, quality, readable = GetContainerItemInfo(bag,slot);
@@ -301,12 +301,12 @@ function MTracker:UpdateNumberInBag()
 end
 
 function MTracker:UpdateNumberInBank()
-	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank enter");
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
 	if MTracker_BankIsOpen then
-		MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank bank frame is open");
+		--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank bank frame is open");
 		MTracker:ResetBankCount();
 
 		--as of 2.00.  
@@ -322,9 +322,9 @@ function MTracker:UpdateNumberInBank()
 				--do nothing, just skip these since they are not bank bags.
 			else
 				for slot=1, GetContainerNumSlots(container), 1 do
-					MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank slot,container is "..slot..","..container);
+					--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank slot,container is "..slot..","..container);
 					local itemLink = GetContainerItemLink(container,slot)
-					MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank itemLink is "..isNullOrValue(itemLink));
+					--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank itemLink is "..isNullOrValue(itemLink));
 					if(itemLink) then	-- slot is empty.
 --						local itemName = MTracker:NameFromLink(itemLink);
 --						local code = MTracker:CodeFromLink(itemLink);	--this is the key to the material
@@ -357,7 +357,7 @@ end
 --	},
 
 function MTracker:UpdateNumberInGuildBank()
-	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInGuildBank enter");
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInGuildBank enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 	local guildName = GetGuildInfo("player");
@@ -385,38 +385,38 @@ function MTracker:UpdateNumberInGuildBank()
 end
 
 function MTracker:ResetBagCount() 
-	MDebug:LevelDebug(mt_TRACE, "MTracker:ResetBagCount enter");
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:ResetBagCount enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
 	for k,v in pairs(MTracker.db.global.materials) do
-		MDebug:LevelDebug(mt_TRACE, "key is "..k);
+		--MDebug:LevelDebug(mt_TRACE, "key is "..k);
 		MTracker.db.global.materials[k].ByPlayer[realmName][playerName].NbInBag=0;
 	end
 end
 
 function MTracker:ResetBankCount() 
-	MDebug:LevelDebug(mt_TRACE, "MTracker:ResetBankCount enter");
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:ResetBankCount enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
 	for k,v in pairs(MTracker.db.global.materials) do
-		MDebug:LevelDebug(mt_TRACE, "key is "..k);
+		--MDebug:LevelDebug(mt_TRACE, "key is "..k);
 		MTracker.db.global.materials[k].ByPlayer[realmName][playerName].NbInBank=0;
 	end
 end
 function MTracker:ResetMailboxCount() 
-	MDebug:LevelDebug(mt_TRACE, "MTracker:ResetMailboxCount enter");
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:ResetMailboxCount enter");
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
 	for k,v in pairs(MTracker.db.global.materials) do
-		MDebug:LevelDebug(mt_TRACE, "key is "..k);
+		--MDebug:LevelDebug(mt_TRACE, "key is "..k);
 		MTracker.db.global.materials[k].ByPlayer[realmName][playerName].NbInMail=0;
 	end
 end
 function MTracker:ResetGBankCount(realmName, guildName,tab)
-	MDebug:LevelDebug(mt_TRACE, "MTracker:ResetGBankCount enter");
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:ResetGBankCount enter");
 --	local playerName = MTracker_CurrentPlayer[1];
 --	local realmName = MTracker_CurrentPlayer[2];
 --	local guildName = GetGuildInfo("player");
@@ -427,7 +427,7 @@ function MTracker:ResetGBankCount(realmName, guildName,tab)
 
 
 	for k,v in pairs(MTracker.db.global.materials) do
-		MDebug:LevelDebug(mt_TRACE, "key is "..k);
+		--MDebug:LevelDebug(mt_TRACE, "key is "..k);
 		if (not MTracker.db.global.materials[k].ByGuild[realmName][guildName]) then
 			MTracker.db.global.materials[k].ByGuild[realmName][guildName]={};
 		end
@@ -459,8 +459,8 @@ function MTracker:getCodeFromName(name)
 end
 
 function MTracker:AddProfessionNameToMaterial(itemCode, professionName) 
-	MDebug:LevelDebug(mt_TRACE, "MTracker:AddProfessionNameToMaterial enter");
-	MDebug:LevelDebug(mt_TRACE, "adding "..isNullOrValue(professionName).." to "..isNullOrValue(itemCode));
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:AddProfessionNameToMaterial enter");
+	--MDebug:LevelDebug(mt_TRACE, "adding "..isNullOrValue(professionName).." to "..isNullOrValue(itemCode));
 
 	if (not MTracker.db.global.materials[itemCode].UsedIn) then
 		MTracker.db.global.materials[itemCode].UsedIn={};
@@ -470,7 +470,7 @@ end
 
 
 function MTracker:UpdateTradeSkillSavedMaterials(tradeSkillName)
-	MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillSavedMaterials enter");
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillSavedMaterials enter");
 
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
@@ -478,15 +478,15 @@ function MTracker:UpdateTradeSkillSavedMaterials(tradeSkillName)
 	for i=1, GetNumTradeSkills(), 1 do
 		--skillType is either "header", if the skillIndex references to a heading, or a string indicating the difficulty to craft the item ("trivial", "easy" (?), "optimal", "difficult").
 		local skillName, skillType, numAvailable, isExpanded = GetTradeSkillInfo(i)
-		MDebug:LevelDebug(mt_TRACE, "skillName is "..isNullOrValue(skillName));
+		--MDebug:LevelDebug(mt_TRACE, "skillName is "..isNullOrValue(skillName));
 		
 		if (skillType ~="header") then
 			for j=1, GetTradeSkillNumReagents(i), 1 do
 				local reagentName, reagentTexture, reagentCount, playerReagentCount = GetTradeSkillReagentInfo(i, j);
-				MDebug:LevelDebug(mt_TRACE, "reagentName is "..isNullOrValue(reagentName));
+				--MDebug:LevelDebug(mt_TRACE, "reagentName is "..isNullOrValue(reagentName));
 				local reagentlink = GetTradeSkillReagentItemLink(i,j);
 				local code = MTracker:CodeFromLink(reagentlink);
-				MDebug:LevelDebug(mt_TRACE, "code is "..isNullOrValue(code));
+				--MDebug:LevelDebug(mt_TRACE, "code is "..isNullOrValue(code));
 
 				if (code) then
 					if (not MTracker.db.global.materials[code]) then
@@ -584,7 +584,7 @@ function MTracker_HookTooltip_old(funcVars, retVal, frame, name, link, quality, 
 end
 
 function MTracker:BuildUsedInString(UsedIntable) 
-	MDebug:LevelDebug(mt_TRACE, "MTracker:BuildUsedInString enter");
+	--MDebug:LevelDebug(mt_TRACE, "MTracker:BuildUsedInString enter");
 	local usedInString="";
 	if (UsedIntable) then
 		for profession, value in pairs(UsedIntable) do
@@ -654,7 +654,7 @@ end
 
 
 function MTracker:ShowCountsInChat(info, itemlink)
-	MDebug:LevelDebug(mt_TRACE, "ShowCountsInChat enter");
+	--MDebug:LevelDebug(mt_TRACE, "ShowCountsInChat enter");
 
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
@@ -690,7 +690,7 @@ function MTracker:ShowCountsInChat(info, itemlink)
 end
 
 function MTracker:AddItem(info, itemlink)
-	MDebug:LevelDebug(mt_TRACE, "AddItem enter");
+	--MDebug:LevelDebug(mt_TRACE, "AddItem enter");
 
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];

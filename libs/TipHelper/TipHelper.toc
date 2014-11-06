@@ -14,4 +14,8 @@
 ## X-URL: http://zip.norganna.org/libs/TipHelper/
 ## X-Feedback: http://forums.norganna.org
 ##
+## X-Curse-Packaged-Version: 40200.02-release
+## X-Curse-Project-Name: MaterialsTracker
+## X-Curse-Project-ID: materials-tracker
+## X-Curse-Repository-ID: wow/materials-tracker/mainline
 Load.xml

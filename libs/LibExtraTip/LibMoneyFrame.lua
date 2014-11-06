@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 @version 1.0
 --]]
 
-local MAJOR,MINOR,REVISION = "LibMoneyFrame", 1, "$Revision$"
+local MAJOR,MINOR,REVISION = "LibMoneyFrame", 1, "$Revision: 45 $"
 
 -- A string unique to this version to prevent frame name conflicts.
 local LIBSTRING = MAJOR.."_"..MINOR.."_"..REVISION

@@ -1,4 +1,4 @@
-MATERIALSTRACKER_VERSION = "40200.02";
+MATERIALSTRACKER_VERSION = "60000.01";
 MATERIALSTRACKER_DB_VERSION = 40200;
 
 --runtime variables
@@ -121,7 +121,7 @@ function MTracker:OnInitialize()
 	MTracker.dbconfig = acedb:New("MTrackerConfigDB", configDefault, true);
 --	MTracker.db = acedb:New("MTrackerPerCharDB", materialsDefault, true);
 
-	MTracker_CurrentPlayer = {UnitName("player"), GetCVar("realmName")};
+	MTracker_CurrentPlayer = {UnitName("player"), GetRealmName()};
 	MTracker:CheckDatabaseVersion();
 end
 
@@ -339,6 +339,21 @@ function MTracker:UpdateNumberInBank()
 					end
 				end
 			end
+		end
+		if (IsReagentBankUnlocked()) then
+		    for slot=1, GetContainerNumSlots(REAGENTBANK_CONTAINER), 1 do
+			local itemLink = GetContainerItemLink(REAGENTBANK_CONTAINER,slot)
+			--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank itemLink is "..isNullOrValue(itemLink));
+			if(itemLink) then	-- slot is empty.
+			    local code, itemName = MTracker:GetNACFromLink(itemLink);
+
+			    if (code and MTracker:ItemBeingTracked(code)) then
+			        local texture, itemCount, locked, quality, readable = GetContainerItemInfo(REAGENTBANK_CONTAINER,slot);
+			        MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBank =
+			            (itemCount + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBank);
+			    end
+			end
+		    end
 		end
 	end
 end

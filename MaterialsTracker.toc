@@ -1,8 +1,8 @@
-## Interface: 40200
+## Interface: 60000
 ## Title: MaterialsTracker |cffff00ff -Ace3-|r
 ## Notes: Provides information of tradeskill and crafting materials that are in the banks and bags of your characters.
 ## Author: Shamino
-## Version: 40200.02
+## Version: 60000.01
 ## X-Category: Inventory
 ## X-Website: http://www.curse-gaming.com/en/files/details/3200/materialstracker/
 ## X-RelSite-WoWI: 6237
@@ -11,6 +11,10 @@
 ## SavedVariablesPerCharacter: MTrackerPerCharDB
 ## X-Embeds: Ace3, Ace2
 ## OptionalDeps: tekDebug
+## X-Curse-Packaged-Version: 60000.01-release
+## X-Curse-Project-Name: MaterialsTracker
+## X-Curse-Project-ID: materials-tracker
+## X-Curse-Repository-ID: wow/materials-tracker/mainline
 
 embeds.xml
 

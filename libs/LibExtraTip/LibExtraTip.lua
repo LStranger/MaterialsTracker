@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 @version 1.1
 --]]
 
-local MAJOR,MINOR,REVISION = "LibExtraTip", 1, "$Revision$"
+local MAJOR,MINOR,REVISION = "LibExtraTip", 1, "$Revision: 67 $"
 
 -- A string unique to this version to prevent frame name conflicts.
 local LIBSTRING = MAJOR.."_"..MINOR.."_"..REVISION
@@ -1216,6 +1216,7 @@ do -- ExtraTip "class" definition
 		local pw = p:GetWidth()
 		local w = self:GetWidth()
 		local d = pw - w
+		SELECTED_CHAT_FRAME:AddMessage("**debug** pw="..pw.." w="..w)
 		if d > .005 then
 			self.sizing = true
 			self:SetWidth(pw)

@@ -218,12 +218,17 @@ end
 function MTracker:UpdateTradeSkillsSavedMaterials()
 	Debug("UpdateTradeSkillsSavedMaterials enter");
 
-	local tradeSkill = GetTradeSkillLine();
+	local _, tradeSkill, _, _, _, _, parentSkillLineDisplayName =
+		C_TradeSkillUI.GetTradeSkillLine()
 	--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillsSavedMaterials tradeSkill opened is "..isNullOrValue(tradeSkill));
 	Debug("UpdateTradeSkillsSavedMaterials: tradeSkill opened is "..isNullOrValue(tradeSkill));
 
 	--TODO: create table in localization file and check that tradeSkill is in there.
 	if (tradeSkill~=nil) then
+		if parentSkillLineDisplayName then
+			tradeSkill = parentSkillLineDisplayName
+		end
+
 		MTracker_TradeSkillNeedScan=false;
 		MTracker:UpdateTradeSkillSavedMaterials(tradeSkill);
 	end
@@ -490,36 +495,39 @@ function MTracker:UpdateTradeSkillSavedMaterials(tradeSkillName)
 	local playerName = MTracker_CurrentPlayer[1];
 	local realmName = MTracker_CurrentPlayer[2];
 
-	for i=1, GetNumTradeSkills(), 1 do
+	-- TODO: prune unused mats from DB for the trade skill
+
+	local recipeIDs = C_TradeSkillUI.GetAllRecipeIDs()
+
 		--skillType is either "header", if the skillIndex references to a heading, or a string indicating the difficulty to craft the item ("trivial", "easy" (?), "optimal", "difficult").
-		local skillName, skillType, numAvailable, isExpanded = GetTradeSkillInfo(i)
+	for _, recipeID in ipairs(recipeIDs) do
+--		local skillName, skillType, numAvailable, isExpanded = GetTradeSkillInfo(i)
+--		local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID);
+
 		--MDebug:LevelDebug(mt_TRACE, "skillName is "..isNullOrValue(skillName));
-		
-		if (skillType ~="header") then
-			for j=1, GetTradeSkillNumReagents(i), 1 do
-				local reagentName, reagentTexture, reagentCount, playerReagentCount = GetTradeSkillReagentInfo(i, j);
+		for reagentIndex = 1, C_TradeSkillUI.GetRecipeNumReagents(recipeID) do
+			local reagentName, reagentTexture, reagentCount, playerReagentCount = C_TradeSkillUI.GetRecipeReagentInfo(recipeID, reagentIndex);
 				--MDebug:LevelDebug(mt_TRACE, "reagentName is "..isNullOrValue(reagentName));
-				local reagentlink = GetTradeSkillReagentItemLink(i,j);
-				local code = MTracker:CodeFromLink(reagentlink);
+			local reagentlink = C_TradeSkillUI.GetRecipeReagentItemLink(recipeID, reagentIndex);
+			local code = MTracker:CodeFromLink(reagentlink);
 				--MDebug:LevelDebug(mt_TRACE, "code is "..isNullOrValue(code));
 
-				if (code) then
-					if (not MTracker.db.global.materials[code]) then
-						MTracker.db.global.materials[code]={};
-						MTracker.db.global.materials[code].ByPlayer={};
-						MTracker.db.global.materials[code].ByPlayer[realmName]={};
-						MTracker.db.global.materials[code].ByPlayer[realmName][playerName]={};
-						MTracker.db.global.materials[code].ByGuild={};
-						MTracker.db.global.materials[code].ByGuild[realmName]={};
-					end
-					MTracker.db.global.materials[code].Texture = reagentTexture;
-					MTracker.db.global.materials[code].Link = reagentlink;
-					MTracker.db.global.materials[code].Name = reagentName;
-					MTracker.db.global.materials[code].tracked = true;
-					MTracker:AddProfessionNameToMaterial(code, tradeSkillName);
+			if (code) then
+				if (not MTracker.db.global.materials[code]) then
+					MTracker.db.global.materials[code]={};
+					MTracker.db.global.materials[code].ByPlayer={};
+					MTracker.db.global.materials[code].ByPlayer[realmName]={};
+					MTracker.db.global.materials[code].ByPlayer[realmName][playerName]={};
+					MTracker.db.global.materials[code].ByGuild={};
+					MTracker.db.global.materials[code].ByGuild[realmName]={};
 				end
+				MTracker.db.global.materials[code].Texture = reagentTexture;
+				MTracker.db.global.materials[code].Link = reagentlink;
+				MTracker.db.global.materials[code].Name = reagentName;
+				MTracker.db.global.materials[code].tracked = true;
+				MTracker:AddProfessionNameToMaterial(code, tradeSkillName);
 			end
-		end		
+		end
 	end
 end
 

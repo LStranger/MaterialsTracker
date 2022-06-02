@@ -252,11 +252,10 @@ function MTracker:UpdateNumberInMailbox()
 		local nbr = GetInboxNumItems();
 		for mailItem=1, nbr, 1 do
 			for attachment=1, ATTACHMENTS_MAX_RECEIVE, 1 do
-				local name, itemTexture, count, quality, canUse = GetInboxItem(mailItem, attachment);
+				local name, code, itemTexture, count, quality, canUse = GetInboxItem(mailItem, attachment);
 				--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox itemName is "..isNullOrValue(name));
 
 				if (name~= nil) then
-					local code = MTracker:getCodeFromName(name);
 --					if (code and MTracker.db.global.materials[code].tracked) then
 					if (code and MTracker:ItemBeingTracked(code)) then
 						--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInMailbox code is "..isNullOrValue(code));
@@ -456,26 +455,6 @@ function MTracker:ResetGBankCount(realmName, guildName,tab)
 		end
 		MTracker.db.global.materials[k].ByGuild[realmName][guildName][tab].NbInGBank=0;
 	end
-end
-function MTracker:getLinkFromName(name)
-	if (name==nil) then return end;
-
-	for key,value in pairs(MTracker.db.global.materials) do 
-		if (MTracker.db.global.materials[key].Name == name) then
-			return MTracker.db.global.materials[key].Link;
-		end
-	end
-	return nil;
-end
-function MTracker:getCodeFromName(name)
-	if (name==nil) then return end;
-
-	for key,value in pairs(MTracker.db.global.materials) do 
-		if (MTracker.db.global.materials[key].Name == name) then
-			return key;
-		end
-	end
-	return nil;
 end
 
 function MTracker:AddProfessionNameToMaterial(itemCode, professionName) 

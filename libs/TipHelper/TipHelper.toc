@@ -1,21 +1,18 @@
 ## Title: TipHelper |cff224477(lib)
 ## Notes: An embeddable library that assists AddOns wishing to use the LibExtraTip tooltip library.
 ##
-## Interface: 40100
+## Interface: 90105
 ## LoadOnDemand: 0
-## OptionalDependencies: !nLog, LibExtraTip
+## Dependencies: LibExtraTip
+## OptionalDependencies: !nLog
 ##
-## Version: 5.11.5146 (DangerousDingo)
-## Revision: $Id: TipHelper.toc 304 2011-05-06 07:50:02Z brykrys $
+## Version: 9.1.BETA.5.2 (OneMawTime)
+## Revision: $Id$
 ## Author: Norganna's AddOns
 ## X-Part-Of: Libraries
 ## X-Category: Library
-## X-Max-Interface: 40000
+## X-Max-Interface: 80100
 ## X-URL: http://zip.norganna.org/libs/TipHelper/
 ## X-Feedback: http://forums.norganna.org
 ##
-## X-Curse-Packaged-Version: 40200.02-release
-## X-Curse-Project-Name: MaterialsTracker
-## X-Curse-Project-ID: materials-tracker
-## X-Curse-Repository-ID: wow/materials-tracker/mainline
 Load.xml

@@ -1,5 +1,5 @@
-MATERIALSTRACKER_VERSION = "90205.02";
-MATERIALSTRACKER_DB_VERSION = 90205;
+MATERIALSTRACKER_VERSION = "100002.01";
+MATERIALSTRACKER_DB_VERSION = 100002;
 
 --runtime variables
 local MTracker_BankIsOpen = false;
@@ -7,7 +7,6 @@ local MTracker_GuildBankIsOpen = false;
 local MTracker_MailboxIsOpen = false;
 local MTracker_MailUpdatesInProgress = false;
 local MTracker_CurrentPlayer = {};
-local MTracker_NUMBER_OF_BAG_SLOTS = 4;
 local MTracker_UseTooltips=true;
 local MTracker_LastMailScan=0;
 local MTracker_MailScanInterval=60;	--time in seconds between mail scans.  appears the UI only retrieves mail from the server every 60 seconds.
@@ -15,6 +14,7 @@ local MTracker_LastTradeSkillOpenTime=0;
 local MTracker_TradeSkillPauseTime=2;
 local MTracker_TradeSkillIsOpen = false;
 local MTracker_TradeSkillNeedScan = false;
+local MTracker_Timer = nil;
 
 local tooltip = LibStub("nTipHelper:1")
 
@@ -192,25 +192,30 @@ function MTracker:GuildBankIsClosed()
 end
 
 function MTracker:TRADE_SKILL_SHOW()
-	if (not MTracker:IsHooked(TradeSkillFrame, "OnUpdate")) then
-		MTracker:HookScript(TradeSkillFrame, "OnUpdate", "TradeSkillFrameOnUpdate")
+	if (not MTracker:IsHooked(ProfessionsFrame, "OnUpdate")) then
+		MTracker:HookScript(ProfessionsFrame, "OnUpdate", "ProfessionsFrameOnUpdate")
 	end
 	MTracker_TradeSkillIsOpen=true;
 	MTracker_TradeSkillNeedScan=true;
-	MTracker_LastTradeSkillOpenTime=GetTime();
 end
 
 function MTracker:TRADE_SKILL_CLOSE()
-	MTracker:Unhook(TradeSkillFrame, "OnUpdate")
+	MTracker:Unhook(ProfessionsFrame, "OnUpdate")
 	MTracker_TradeSkillIsOpen=false;
 	MTracker_TradeSkillNeedScan=false;
 	MTracker_LastTradeSkillOpenTime=0;
 end
 
-function MTracker:TradeSkillFrameOnUpdate(...)
+function MTracker:ProfessionsFrameOnUpdate(...)
 	if (not UnitAffectingCombat("player")) then
-		if ((GetTime()-MTracker_LastTradeSkillOpenTime) > MTracker_TradeSkillPauseTime and MTracker_TradeSkillNeedScan) then
-			MTracker:UpdateTradeSkillsSavedMaterials();
+		if MTracker_TradeSkillNeedScan then
+			-- Is there any better way to do this than delay?
+			if (not MTracker_Timer or MTracker_Timer:IsCancelled()) then
+				MTracker_Timer = C_Timer.NewTimer(MTracker_TradeSkillPauseTime,
+					function ()
+						MTracker:UpdateTradeSkillsSavedMaterials()
+					end)
+			end
 		end
 	end
 end
@@ -218,16 +223,21 @@ end
 function MTracker:UpdateTradeSkillsSavedMaterials()
 	Debug("UpdateTradeSkillsSavedMaterials enter");
 
-	local _, tradeSkill, _, _, _, _, parentSkillLineDisplayName =
-		C_TradeSkillUI.GetTradeSkillLine()
+	if (MTracker_Timer and not MTracker_Timer:IsCancelled()) then
+		MTracker_Timer:Cancel()
+		MTracker_Timer = nil
+	end
+
+	local profInfo = C_TradeSkillUI.GetBaseProfessionInfo()
+	local tradeSkill
+	if profInfo then
+		tradeSkill = profInfo.professionName
+	end
 	--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillsSavedMaterials tradeSkill opened is "..isNullOrValue(tradeSkill));
 	Debug("UpdateTradeSkillsSavedMaterials: tradeSkill opened is "..isNullOrValue(tradeSkill));
 
 	--TODO: create table in localization file and check that tradeSkill is in there.
 	if (tradeSkill~=nil) then
-		if parentSkillLineDisplayName then
-			tradeSkill = parentSkillLineDisplayName
-		end
 
 		MTracker_TradeSkillNeedScan=false;
 		MTracker:UpdateTradeSkillSavedMaterials(tradeSkill);
@@ -279,9 +289,9 @@ function MTracker:UpdateNumberInBag()
 		--reset bag count for this player
 		MTracker:ResetBagCount();
 
-		for bag=0, MTracker_NUMBER_OF_BAG_SLOTS, 1 do
-			for slot=1, GetContainerNumSlots(bag), 1 do
-				local itemLink = GetContainerItemLink(bag,slot);
+		for bag=BACKPACK_CONTAINER, NUM_TOTAL_EQUIPPED_BAG_SLOTS, 1 do
+			for slot=1, C_Container.GetContainerNumSlots(bag), 1 do
+				local itemLink = C_Container.GetContainerItemLink(bag,slot);
 				if(itemLink) then	--bag slot is empty.
 	--				local itemName = MTracker:NameFromLink(itemLink);
 	--				local code = MTracker:CodeFromLink(itemLink);	--the code is the key to the material
@@ -291,9 +301,9 @@ function MTracker:UpdateNumberInBag()
 					--MDebug:LevelDebug(mt_TRACE, "MTracker_UpdateNumberInBag code is "..isNullOrValue(code));
 
 					if (code and MTracker:ItemBeingTracked(code)) then
-						local texture, itemCount, locked, quality, readable = GetContainerItemInfo(bag,slot);
+						local info = C_Container.GetContainerItemInfo(bag,slot);
 						MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBag = 
-							(itemCount + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBag);
+							(info.stackCount + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBag);
 					end
 				end
 			end
@@ -321,13 +331,13 @@ function MTracker:UpdateNumberInBank()
 		--there are now 7 bank bag slots
 		--there are 28 generic bank slots
 		--GetNumBankSlots()   - Returns total purchased bank bag slots, and a flag indicating if it's full.
-		for container=-1, (GetNumBankSlots()+4), 1 do
-			if (container >= 0 and container<5) then 
+		for container=BANK_CONTAINER, (GetNumBankSlots()+NUM_TOTAL_EQUIPPED_BAG_SLOTS), 1 do
+			if (container >= BACKPACK_CONTAINER and container <= NUM_TOTAL_EQUIPPED_BAG_SLOTS) then 
 				--do nothing, just skip these since they are not bank bags.
 			else
-				for slot=1, GetContainerNumSlots(container), 1 do
+				for slot=1, C_Container.GetContainerNumSlots(container), 1 do
 					--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank slot,container is "..slot..","..container);
-					local itemLink = GetContainerItemLink(container,slot)
+					local itemLink = C_Container.GetContainerItemLink(container,slot)
 					--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank itemLink is "..isNullOrValue(itemLink));
 					if(itemLink) then	-- slot is empty.
 --						local itemName = MTracker:NameFromLink(itemLink);
@@ -336,25 +346,25 @@ function MTracker:UpdateNumberInBank()
 						local code, itemName = MTracker:GetNACFromLink(itemLink);
 
 						if (code and MTracker:ItemBeingTracked(code)) then
-							local texture, itemCount, locked, quality, readable = GetContainerItemInfo(container,slot);
+							local info = C_Container.GetContainerItemInfo(container,slot);
 							MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBank = 
-								(itemCount + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBank);
+								(info.stackCount + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBank);
 						end
 					end
 				end
 			end
 		end
 		if (IsReagentBankUnlocked()) then
-		    for slot=1, GetContainerNumSlots(REAGENTBANK_CONTAINER), 1 do
-			local itemLink = GetContainerItemLink(REAGENTBANK_CONTAINER,slot)
+		    for slot=1, C_Container.GetContainerNumSlots(REAGENTBANK_CONTAINER), 1 do
+			local itemLink = C_Container.GetContainerItemLink(REAGENTBANK_CONTAINER,slot)
 			--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateNumberInBank itemLink is "..isNullOrValue(itemLink));
 			if(itemLink) then	-- slot is empty.
 			    local code, itemName = MTracker:GetNACFromLink(itemLink);
 
 			    if (code and MTracker:ItemBeingTracked(code)) then
-			        local texture, itemCount, locked, quality, readable = GetContainerItemInfo(REAGENTBANK_CONTAINER,slot);
+			        local info = C_Container.GetContainerItemInfo(REAGENTBANK_CONTAINER,slot);
 			        MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBank =
-			            (itemCount + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBank);
+			            (info.stackCount + MTracker.db.global.materials[code].ByPlayer[realmName][playerName].NbInBank);
 			    end
 			end
 		    end
@@ -467,6 +477,27 @@ function MTracker:AddProfessionNameToMaterial(itemCode, professionName)
 	MTracker.db.global.materials[itemCode].UsedIn[professionName]=true;
 end
 
+function MTracker:AddReagentToDB(realmName, playerName, tradeSkillName, reagentLink)
+	local reagentName, _, _, _, _, _, _, _, _, reagentTexture = GetItemInfo(reagentLink)
+	local code = MTracker:CodeFromLink(reagentLink);
+	--MDebug:LevelDebug(mt_TRACE, "reagentName is "..isNullOrValue(reagentName).." code is "..isNullOrValue(code));
+
+	if (code) then
+		if (not MTracker.db.global.materials[code]) then
+			MTracker.db.global.materials[code]={};
+			MTracker.db.global.materials[code].ByPlayer={};
+			MTracker.db.global.materials[code].ByPlayer[realmName]={};
+			MTracker.db.global.materials[code].ByPlayer[realmName][playerName]={};
+			MTracker.db.global.materials[code].ByGuild={};
+			MTracker.db.global.materials[code].ByGuild[realmName]={};
+		end
+		MTracker.db.global.materials[code].Texture = reagentTexture;
+		MTracker.db.global.materials[code].Link = reagentLink;
+		MTracker.db.global.materials[code].Name = reagentName;
+		MTracker.db.global.materials[code].tracked = true;
+		MTracker:AddProfessionNameToMaterial(code, tradeSkillName);
+	end
+end
 
 function MTracker:UpdateTradeSkillSavedMaterials(tradeSkillName)
 	--MDebug:LevelDebug(mt_TRACE, "MTracker:UpdateTradeSkillSavedMaterials enter");
@@ -484,30 +515,25 @@ function MTracker:UpdateTradeSkillSavedMaterials(tradeSkillName)
 --		local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID);
 
 		--MDebug:LevelDebug(mt_TRACE, "skillName is "..isNullOrValue(skillName));
-		for reagentIndex = 1, C_TradeSkillUI.GetRecipeNumReagents(recipeID) do
-			local reagentName, reagentTexture, reagentCount, playerReagentCount = C_TradeSkillUI.GetRecipeReagentInfo(recipeID, reagentIndex);
-				--MDebug:LevelDebug(mt_TRACE, "reagentName is "..isNullOrValue(reagentName));
-			local reagentlink = C_TradeSkillUI.GetRecipeReagentItemLink(recipeID, reagentIndex);
-			local code = MTracker:CodeFromLink(reagentlink);
-				--MDebug:LevelDebug(mt_TRACE, "code is "..isNullOrValue(code));
-
-			if (code) then
-				if (not MTracker.db.global.materials[code]) then
-					MTracker.db.global.materials[code]={};
-					MTracker.db.global.materials[code].ByPlayer={};
-					MTracker.db.global.materials[code].ByPlayer[realmName]={};
-					MTracker.db.global.materials[code].ByPlayer[realmName][playerName]={};
-					MTracker.db.global.materials[code].ByGuild={};
-					MTracker.db.global.materials[code].ByGuild[realmName]={};
+		local reagentIndex
+		local reagentQ
+		for reagentIndex = 1, 100 do
+			local reagentLink = C_TradeSkillUI.GetRecipeFixedReagentItemLink(recipeID, reagentIndex)
+			local reagentLinkQ = C_TradeSkillUI.GetRecipeQualityReagentItemLink(recipeID, reagentIndex, 1)
+			if reagentLink then
+				MTracker:AddReagentToDB(realmName, playerName, tradeSkillName, reagentLink)
+			elseif reagentLinkQ then
+				for reagentQ = 2, 5 do
+					MTracker:AddReagentToDB(realmName, playerName, tradeSkillName, reagentLinkQ)
+					reagentLinkQ = C_TradeSkillUI.GetRecipeQualityReagentItemLink(recipeID, reagentIndex, reagentQ)
+					if not reagentLinkQ then break end
 				end
-				MTracker.db.global.materials[code].Texture = reagentTexture;
-				MTracker.db.global.materials[code].Link = reagentlink;
-				MTracker.db.global.materials[code].Name = reagentName;
-				MTracker.db.global.materials[code].tracked = true;
-				MTracker:AddProfessionNameToMaterial(code, tradeSkillName);
+			else
+				break
 			end
 		end
 	end
+	MTracker:Print("Updated "..tradeSkillName..": "..table.getn(recipeIDs).." recipes found");
 end
 
 function MTracker:ItemBeingTracked(code) 

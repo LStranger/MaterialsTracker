@@ -1,0 +1,12 @@
+Release 100002.02:
+    - Reworked to work with new profeccions API.
+    - Updated for new Reagents Bag slot.
+    - Updated TOC to 10.0.2 version.
+
+Release 90205.02:
+    - Fixed packaging.
+
+Release 90205.01:
+    - Updated libs, added used libs to the package.
+    - Made everything to work with retail game.
+    - Updated TOC to 9.2.5 version.
